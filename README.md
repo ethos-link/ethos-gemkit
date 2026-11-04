@@ -4,9 +4,16 @@ Shared development defaults for Ethos Link gems: Ruby 4, Standard, optional Rail
 8 linting, hooks, package checks and one shared release workflow. The toolkit
 belongs in the development/test Gemfile, never a consumer's runtime gemspec.
 
-During bootstrap, pin the Git dependency and workflow callers to the same reviewed
-commit; the toolkit has not been published. See the working
-[Cloudflare Tunnel Gemfile](https://github.com/ethos-link/cloudflare-tunnel/blob/feat/ethos-gemkit/Gemfile).
+Install the published gem in the development/test Gemfile:
+
+```ruby
+gem "ethos-gemkit", "0.1.0", group: [:development, :test], require: false
+```
+
+Pin workflow callers to the matching release commit. Version 0.1.0 uses
+`e1be29225c48563f3725edaaca5401639c0de119`; keep that full SHA in Actions references
+and upgrade the gem version and workflow pins together. See the
+[Cloudflare Tunnel migration](https://github.com/ethos-link/cloudflare-tunnel/pull/4).
 
 A standard gem needs this Rakefile:
 
@@ -73,7 +80,8 @@ Ordinary feature/fix PRs run verification; only a release PR starts publication.
 
 The SDK release workflow listens directly for merged release PRs and version-tag
 pushes. Consumer callers must listen for both `pull_request: types: [closed]`
-against `main` and `push: tags: ["v*"]`, and pin the same SDK commit as the Gemfile.
+against `main` and `push: tags: ["v*"]`, and pin the commit matching the installed
+Gemkit release.
 See the [Tunnel caller](https://github.com/ethos-link/cloudflare-tunnel/blob/feat/ethos-gemkit/.github/workflows/release.yml).
 
 ### Prepare and review
@@ -96,8 +104,9 @@ bundle exec rake 'release:prepare[1.2.0]'
 ```
 
 For an initial, unpublished version that is already in the gemspec and has no
-tag, an explicit current version is supported. Gemkit's initial release can use
-`bundle exec rake 'release:prepare[0.1.0]'` after pending-publisher setup.
+tag, an explicit current version is supported. For example, a new gem starting
+at 0.1.0 can use `bundle exec rake 'release:prepare[0.1.0]'` after pending-publisher
+setup.
 
 The task checks the working tree, canonical origin, current main, installed hooks
 and target tag. It creates `chore/release-vX.Y.Z`, updates the version and
