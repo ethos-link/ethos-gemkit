@@ -68,10 +68,12 @@ jobs:
         env:
           BUNDLE_WITHOUT: test
           BUNDLE_GEMFILE: ${{ github.workspace }}/.gemkit/Gemfile
+          GH_TOKEN: ${{ github.token }}
           GITLAB_DEPLOY_KEY: ${{ secrets.GITLAB_DEPLOY_KEY }}
           GITLAB_KNOWN_HOSTS: ${{ secrets.GITLAB_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
+          gh auth setup-git --hostname github.com
           test -n "$GITLAB_DEPLOY_KEY"
           test -n "$GITLAB_KNOWN_HOSTS"
           key_directory=$(mktemp -d)
