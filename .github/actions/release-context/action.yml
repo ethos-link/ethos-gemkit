@@ -26,8 +26,9 @@ runs:
       env:
         ACTION_ROOT: ${{ github.action_path }}
       run: |
+        echo "BUNDLE_WITHOUT=test" >> "$GITHUB_ENV"
         echo "BUNDLE_GEMFILE=$(realpath "$ACTION_ROOT/../../../Gemfile")" >> "$GITHUB_ENV"
-        BUNDLE_GEMFILE="$(realpath "$ACTION_ROOT/../../../Gemfile")" BUNDLE_FROZEN=true bundle install
+        BUNDLE_GEMFILE="$(realpath "$ACTION_ROOT/../../../Gemfile")" BUNDLE_WITHOUT=test BUNDLE_FROZEN=true bundle install
     - id: context
       shell: bash
       env:

@@ -28,8 +28,9 @@ runs:
       env:
         ACTION_ROOT: ${{ github.action_path }}
       run: |
+        echo "BUNDLE_WITHOUT=test" >> "$GITHUB_ENV"
         echo "BUNDLE_GEMFILE=$(realpath "$ACTION_ROOT/../../../Gemfile")" >> "$GITHUB_ENV"
-        BUNDLE_GEMFILE="$(realpath "$ACTION_ROOT/../../../Gemfile")" BUNDLE_FROZEN=true bundle install
+        BUNDLE_GEMFILE="$(realpath "$ACTION_ROOT/../../../Gemfile")" BUNDLE_WITHOUT=test BUNDLE_FROZEN=true bundle install
     - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
       with:
         name: release-${{ inputs.commit }}

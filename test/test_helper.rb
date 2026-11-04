@@ -25,7 +25,8 @@ class GemkitTest < Minitest::Test
 
   def capture(directory, *arguments, environment: {})
     Bundler.with_unbundled_env do
-      Open3.capture3({"BUNDLE_GEMFILE" => File.join(directory, "Gemfile")}.merge(environment), *arguments, chdir: directory)
+      paths = [*Gem.path, *Gem.loaded_specs.values.map(&:base_dir)].uniq.join(File::PATH_SEPARATOR)
+      Open3.capture3({"BUNDLE_GEMFILE" => File.join(directory, "Gemfile"), "GEM_PATH" => paths}.merge(environment), *arguments, chdir: directory)
     end
   end
 end

@@ -37,9 +37,10 @@ jobs:
         with:
           ruby-version: '4.0.9'
           bundler: '4.0.11'
-      - run: BUNDLE_GEMFILE="$PWD/.gemkit/Gemfile" BUNDLE_FROZEN=true bundle install
+      - run: BUNDLE_GEMFILE="$PWD/.gemkit/Gemfile" BUNDLE_WITHOUT=test BUNDLE_FROZEN=true bundle install
       - id: config
         env:
+          BUNDLE_WITHOUT: test
           BUNDLE_GEMFILE: ${{ github.workspace }}/.gemkit/Gemfile
         run: echo "url=$(bundle exec ethos-gemkit gitlab-url)" >> "$GITHUB_OUTPUT"
   sync:
@@ -62,9 +63,10 @@ jobs:
         with:
           ruby-version: '4.0.9'
           bundler: '4.0.11'
-      - run: BUNDLE_GEMFILE="$PWD/.gemkit/Gemfile" BUNDLE_FROZEN=true bundle install
+      - run: BUNDLE_GEMFILE="$PWD/.gemkit/Gemfile" BUNDLE_WITHOUT=test BUNDLE_FROZEN=true bundle install
       - name: Sync with scoped key and pinned host keys
         env:
+          BUNDLE_WITHOUT: test
           BUNDLE_GEMFILE: ${{ github.workspace }}/.gemkit/Gemfile
           GITLAB_DEPLOY_KEY: ${{ secrets.GITLAB_DEPLOY_KEY }}
           GITLAB_KNOWN_HOSTS: ${{ secrets.GITLAB_KNOWN_HOSTS }}
