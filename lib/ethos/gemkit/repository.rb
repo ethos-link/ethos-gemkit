@@ -18,7 +18,9 @@ module Ethos
 
       def run(*arguments, environment: {})
         env = Bundler.unbundled_env.merge("BUNDLE_GEMFILE" => File.join(config.root, "Gemfile"))
-        env["GEM_PATH"] = [*Gem.path, *Gem.loaded_specs.values.map(&:base_dir)].uniq.join(File::PATH_SEPARATOR)
+        roots = [*Gem.path, *Gem.loaded_specs.values.map(&:base_dir)].uniq
+        env["GEM_PATH"] = roots.join(File::PATH_SEPARATOR)
+        env["PATH"] = [*roots.map { |root| File.join(root, "bin") }, env.fetch("PATH")].join(File::PATH_SEPARATOR)
         output, error, status = Open3.capture3(env.merge(environment), *arguments, chdir: config.root, unsetenv_others: true)
         unless status.success?
           raise Error, "#{arguments.first(2).join(" ")} failed: #{output}#{error}"
