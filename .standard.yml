@@ -1,10 +1,8 @@
 ruby_version: "4.0"
 plugins:
   - ethos-gemkit
-# Rails is installed for fixtures; these are command-line Rake tasks.
+# CLI tasks intentionally write to the terminal and abort on failure.
 ignore:
-  - lib/ethos/gemkit/tasks.rb:
-      - Rails/Output
   - lib/ethos/gemkit/release_tasks.rb:
       - Rails/Output
       - Rails/Exit

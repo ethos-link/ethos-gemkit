@@ -1,9 +1,6 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require "ethos/gemkit/configuration"
-require "ethos/gemkit/doctor"
-require "ethos/gemkit/setup"
 require "ethos/gemkit/branch"
 require "ethos/gemkit/commit_message"
 require "optparse"
@@ -11,25 +8,6 @@ require "optparse"
 begin
   command = ARGV.shift
   case command
-  when "setup"
-    options = {checks: ["test"], release_mode: "staged"}
-    write = false
-    parser = OptionParser.new do |opts|
-      opts.on("--write", "Apply the previewed changes") { write = true }
-      opts.on("--checks TASKS", "Comma-separated local Rake checks") { |value| options[:checks] = value.split(",") }
-      opts.on("--release-mode MODE", "staged or atomic") { |value| options[:release_mode] = value }
-    end
-    parser.parse!(ARGV)
-    abort "Unexpected arguments: #{ARGV.join(" ")}" unless ARGV.empty?
-    setup = Ethos::Gemkit::Setup.new(**options)
-    if write
-      puts setup.apply.map { |name| "Updated #{name}" }
-    else
-      setup.changes.each do |name, content|
-        puts "=== #{name} (preview) ===", content
-      end
-      puts "Run setup --write to apply. Add ethos-gemkit to your development/test Gemfile first."
-    end
   when "commitlint"
     input = nil
     OptionParser.new do |opts|
@@ -42,53 +20,10 @@ begin
   when "guard"
     abort "Usage: ethos-gemkit guard" unless ARGV.empty?
     Ethos::Gemkit::Branch.check
-  when "doctor"
-    abort "Usage: ethos-gemkit doctor" unless ARGV.empty?
-    config = Ethos::Gemkit::Configuration.load
-    Ethos::Gemkit::Doctor.new(config).check
-    puts "ethos-gemkit #{Ethos::Gemkit::VERSION}: #{config.name} configured"
-  when "gitlab-url", "gitlab-sync"
-    abort "Unexpected arguments" unless ARGV.empty?
-    require "ethos/gemkit/gitlab_sync"
-    config = Ethos::Gemkit::Configuration.load
-    if command == "gitlab-sync"
-      puts Ethos::Gemkit::GitlabSync.new(config).run
-    else
-      puts config.gitlab_url
-    end
-  when "release-context"
-    require "ethos/gemkit/provenance"
-    options = {}
-    OptionParser.new do |opts|
-      %w[repository tag run-id].each { |key| opts.on("--#{key} VALUE") { |value| options[key.tr("-", "_").to_sym] = value } }
-    end.parse!(ARGV)
-    abort "Provide repository, tag and run-id" unless ARGV.empty? && options.keys.sort == %i[repository run_id tag]
-    puts JSON.generate(Ethos::Gemkit::Provenance.context(**options))
-  when "artifact-verify", "artifact-publish", "artifact-notes"
-    require "ethos/gemkit/artifact"
-    options = {}
-    OptionParser.new do |opts|
-      %w[directory repository tag commit name host].each do |key|
-        opts.on("--#{key} VALUE") { |value| options[key.to_sym] = value }
-      end
-    end.parse!(ARGV)
-    abort "Provide directory, repository, tag, commit, name and host" unless ARGV.empty? && options.keys.sort == %i[commit directory host name repository tag]
-    artifact = Ethos::Gemkit::Artifact.new(options.delete(:directory))
-    artifact.verify(**options)
-    if ENV["GITHUB_ACTIONS"] == "true"
-      require "ethos/gemkit/provenance"
-      Ethos::Gemkit::Provenance.verify(artifact.record, run_id: ENV.fetch("SOURCE_RUN_ID"))
-    end
-    case command
-    when "artifact-publish" then puts artifact.publish(**options)
-    when "artifact-notes" then puts artifact.publish_notes(**options)
-    else
-      puts "Release artifact verified"
-    end
   when "version", "--version"
     puts Ethos::Gemkit::VERSION
   else
-    abort "Usage: ethos-gemkit setup [--write] | doctor | guard | commitlint --message MESSAGE_OR_FILE | --version"
+    abort "Usage: ethos-gemkit guard | commitlint --message MESSAGE_OR_FILE | --version"
   end
 rescue Ethos::Gemkit::Error, OptionParser::ParseError => error
   abort error.message

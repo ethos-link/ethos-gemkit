@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require "commitlint"
 require_relative "../gemkit"
 
 module Ethos
@@ -11,7 +10,7 @@ module Ethos
       def self.validate(message)
         cleaned = message.lines.reject { |line| line.start_with?("#") }.join.strip
         header = cleaned.lines.first.to_s.chomp
-        type = header[/\A([a-z]+)(?:\([^)\n]+\))?!?: \S/, 1]
+        type = header[/\A([a-z]+)(?:\([^()\n]+\))?!?: \S/, 1]
         unless TYPES.include?(type)
           raise Error, "Use a Conventional Commit header with one of: #{TYPES.join(", ")}"
         end
@@ -20,11 +19,6 @@ module Ethos
           raise Error, "Separate the commit subject and body with a blank line"
         end
 
-        # Upstream has a fixed type list without ci/build. Adapt only its grammar
-        # input after validating our policy; never change the actual commit text.
-        grammar = cleaned.sub(/\A(?:build|ci)(?=[:(!])/, "chore")
-        validator = ::Commitlint::Validator.new(grammar)
-        raise Error, validator.errors.join("\n") unless validator.valid?
         true
       end
     end

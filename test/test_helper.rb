@@ -12,10 +12,8 @@ require "ethos/gemkit/configuration"
 class GemkitTest < Minitest::Test
   def configuration(name = "fixture")
     {
-      "schema_version" => 1, "workflow_contract" => 1, "gem_name" => name,
-      "repository" => "ethos-link/#{name}", "default_branch" => "main",
-      "version_file" => "lib/#{name}/version.rb", "metadata_files" => ["CHANGELOG.md"],
-      "release_mode" => "staged", "checks" => ["test"],
+      "gem_name" => name, "repository" => "ethos-link/#{name}",
+      "version_file" => "lib/#{name}/version.rb", "checks" => ["test"],
       "registry" => {"kind" => "rubygems", "host" => "https://rubygems.org"}
     }
   end

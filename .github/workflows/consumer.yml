@@ -1,10 +1,6 @@
 name: Gem verification
 on:
   workflow_call:
-    inputs:
-      rehearse:
-        type: boolean
-        default: false
 permissions:
   contents: read
 jobs:
@@ -24,5 +20,3 @@ jobs:
         with:
           tool: git-cliff@2.12.0
       - run: bundle exec rake verify
-      - if: inputs.rehearse
-        run: bundle exec rake release:rehearse
