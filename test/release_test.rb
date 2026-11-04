@@ -89,6 +89,7 @@ class ReleaseTest < GemkitTest
     git("config", "push.followTags", "true")
     git("tag", "-a", "local-backup", "-m", "Unrelated tag")
     before = git("rev-parse", "HEAD")
+    git("branch", "chore/release-v0.1.1", "v0.1.0^{}") # Already merged preparation from a failed release.
     output = command("bundle", "exec", "rake", "release:prepare[patch]")
     assert_includes output, "https://github.com/ethos-link/fixture/pull/1"
     assert_includes output, "Merge this release PR"
@@ -167,6 +168,16 @@ class ReleaseTest < GemkitTest
     assert_includes command("bundle", "exec", "rake", "release:prepare[patch]", success: false), "origin/main"
     assert_empty git("status", "--porcelain")
     assert_equal "0.1.0", File.read(File.join(@root, "lib/fixture/version.rb"))[/VERSION = "([^"]+)"/, 1]
+    git("merge", "--ff-only", "feature/release")
+    git("switch", "-c", "chore/release-v0.1.1")
+    File.write(File.join(@root, "README.md"), "Unmerged release work\n")
+    git("add", "README.md")
+    git("commit", "-m", "docs: preserve unmerged release work")
+    unmerged = git("rev-parse", "HEAD")
+    git("switch", "main")
+    assert_includes command("bundle", "exec", "rake", "release:prepare[patch]", success: false), "contains unmerged commits"
+    assert_equal unmerged, git("rev-parse", "chore/release-v0.1.1")
+    assert_empty git("status", "--porcelain")
   end
 
   def test_initial_untagged_version_can_be_prepared_without_incrementing_it

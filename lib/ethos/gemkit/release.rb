@@ -50,7 +50,15 @@ module Ethos
           raise Error, "Start from main or #{branch} at origin/main"
         end
         run("gh", "auth", "status", "--hostname", "github.com")
-        git("switch", "-c", branch) if current_branch == "main"
+        if current_branch == "main"
+          unless git("branch", "--list", branch).empty?
+            unless git("rev-list", "--count", "origin/main..#{branch}") == "0"
+              raise Error, "Existing #{branch} contains unmerged commits; review it before retrying"
+            end
+            git("branch", "-d", branch)
+          end
+          git("switch", "-c", branch)
+        end
         Branch.check(@config.root)
         File.write(file, text.sub(literal, %(VERSION = "#{target}")))
         run("git-cliff", "--config", "cliff.toml", "--unreleased", "--tag", "v#{target}", "--prepend", "CHANGELOG.md")
