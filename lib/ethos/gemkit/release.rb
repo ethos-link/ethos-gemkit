@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "open3"
+require "bundler"
 require_relative "configuration"
 require_relative "branch"
 
@@ -15,11 +16,18 @@ module Ethos
         raise Error, "Cannot load gemspec" unless spec
       end
 
-      # Ordinary uncommitted changes, reviewed and merged through the normal PR.
-      # No commits, remote writes, tags, hook exceptions or persistent state.
-      def prepare(target)
-        Branch.check(@config.root)
+      # Release metadata uses an ordinary branch and PR; main is never committed.
+      def prepare(target = "patch")
         clean
+        canonical_origin
+        git("fetch", "--no-tags", "origin", "refs/heads/main:refs/remotes/origin/main")
+        unless git("rev-parse", "HEAD") == git("rev-parse", "origin/main")
+          raise Error, "Start from clean main at origin/main; fetch and fast-forward before preparing a release"
+        end
+        %w[pre-commit commit-msg].each do |hook|
+          path = File.expand_path(git("rev-parse", "--git-path", "hooks/#{hook}"), @config.root)
+          raise Error, "Install hooks with bundle exec lefthook install" unless File.executable?(path)
+        end
         file = @config.path(@config.data.fetch("version_file"))
         text = File.read(file)
         current = spec.version.to_s
@@ -30,30 +38,51 @@ module Ethos
           ((index + 1)..2).each { |position| parts[position] = 0 }
           target = parts.join(".")
         end
-        unless target.to_s.match?(/\A\d+\.\d+\.\d+\z/) && Gem::Version.new(target) > spec.version
-          raise Error, "Use major, minor, patch or a newer X.Y.Z version"
+        unless target.to_s.match?(/\A\d+\.\d+\.\d+\z/) && Gem::Version.new(target) >= spec.version
+          raise Error, "Use major, minor, patch or a X.Y.Z version that has not been tagged"
         end
         literal = %(VERSION = "#{current}")
         raise Error, "Expected a literal #{literal} in version_file" unless text.include?(literal)
         raise Error, "Release tag already exists" unless git("tag", "--list", "v#{target}").empty? && git("ls-remote", "--tags", "origin", "refs/tags/v#{target}").empty?
+        branch = "chore/release-v#{target}"
+        current_branch = git("branch", "--show-current")
+        unless ["main", branch].include?(current_branch)
+          raise Error, "Start from main or #{branch} at origin/main"
+        end
+        run("gh", "auth", "status", "--hostname", "github.com")
+        git("switch", "-c", branch) if current_branch == "main"
+        Branch.check(@config.root)
         File.write(file, text.sub(literal, %(VERSION = "#{target}")))
         run("git-cliff", "--config", "cliff.toml", "--unreleased", "--tag", "v#{target}", "--prepend", "CHANGELOG.md")
-        "Prepared v#{target}. Run bundle lock --local, review git diff, verify and commit through your PR."
+        run("bundle", "lock", "--local")
+        run("bundle", "exec", "rake", "verify")
+        files = [@config.data.fetch("version_file"), "CHANGELOG.md", "Gemfile.lock"]
+        unless (git("diff", "--name-only").lines.map(&:strip) - files).empty? && git("ls-files", "--others", "--exclude-standard").empty?
+          raise Error, "Verification changed unrelated files; review git diff before committing"
+        end
+        title = "chore(release): prepare v#{target}"
+        body = "Prepare #{spec.name} #{target} for publication.\n\nRecord the version, generated notes and lockfile after verification."
+        git("add", "--", *files)
+        git("commit", "-m", title, "-m", body)
+        clean
+        git("push", "--no-follow-tags", "--set-upstream", "origin", branch)
+        url = run("gh", "pr", "create", "--repo", @config.data.fetch("repository"),
+          "--base", "main", "--head", branch, "--title", title,
+          "--body", "#{body}\n\nMerging this PR creates annotated tag v#{target} and publishes the verified gem.").strip
+        "#{url}\nMerge this release PR to tag and publish v#{target}."
       end
 
-      def verify(tag)
+      def verify(tag, tagged: true)
         clean
         raise Error, "Tag and gem version differ" unless tag == "v#{spec.version}"
-        origin = git("config", "--get", "remote.origin.url")
-        repo = ENV.fetch("GITHUB_REPOSITORY", @config.data.fetch("repository"))
-        unless ["https://github.com/#{repo}.git", "https://github.com/#{repo}", "git@github.com:#{repo}.git"].include?(origin)
-          raise Error, "Release origin must be the canonical GitHub repository"
-        end
+        canonical_origin
         ref = "refs/tags/#{tag}"
-        object = git("rev-parse", ref)
-        raise Error, "Release tag must be annotated" unless git("cat-file", "-t", ref) == "tag"
-        raise Error, "Tag must identify HEAD" unless git("rev-parse", "#{ref}^{}") == git("rev-parse", "HEAD")
-        raise Error, "Canonical tag object differs" unless git("ls-remote", "--refs", "origin", ref).split.first == object
+        if tagged
+          object = git("rev-parse", ref)
+          raise Error, "Release tag must be annotated" unless git("cat-file", "-t", ref) == "tag"
+          raise Error, "Tag must identify HEAD" unless git("rev-parse", "#{ref}^{}") == git("rev-parse", "HEAD")
+          raise Error, "Canonical tag object differs" unless git("ls-remote", "--refs", "origin", ref).split.first == object
+        end
         git("fetch", "--no-tags", "origin", "refs/heads/main:refs/remotes/origin/main")
         git("merge-base", "--is-ancestor", "HEAD", "origin/main")
         spec.files.each do |file|
@@ -68,6 +97,14 @@ module Ethos
 
       private
 
+      def canonical_origin
+        origin = git("config", "--get", "remote.origin.url")
+        repo = ENV.fetch("GITHUB_REPOSITORY", @config.data.fetch("repository"))
+        unless ["https://github.com/#{repo}.git", "https://github.com/#{repo}", "git@github.com:#{repo}.git", "ssh://git@github.com/#{repo}.git"].include?(origin)
+          raise Error, "Release origin must be the canonical GitHub repository"
+        end
+      end
+
       def clean
         raise Error, "Release requires a clean working tree" unless git("status", "--porcelain").empty?
       end
@@ -77,7 +114,9 @@ module Ethos
       end
 
       def run(*arguments)
-        output, error, status = Open3.capture3(*arguments, chdir: @config.root)
+        environment = {"BUNDLE_GEMFILE" => File.join(@config.root, "Gemfile"),
+                       "GEM_PATH" => [*Gem.path, *Gem.loaded_specs.values.map(&:base_dir)].uniq.join(File::PATH_SEPARATOR)}
+        output, error, status = Bundler.with_unbundled_env { Open3.capture3(environment, *arguments, chdir: @config.root) }
         raise Error, "#{arguments.first(3).join(" ")} failed: #{output}#{error}" unless status.success?
         output
       end
