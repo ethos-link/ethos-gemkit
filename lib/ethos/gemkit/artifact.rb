@@ -15,16 +15,28 @@ module Ethos
 
       def self.build(config, tag:, notes:, directory: config.path("pkg/release"))
         repository = Repository.new(config)
+        repository.clean
         record = {"schema" => 1, "repository" => config.data.fetch("repository"), "name" => config.name,
                   "tag" => tag, "commit" => repository.git("rev-parse", "HEAD"),
                   "tag_object" => repository.git("rev-parse", "refs/tags/#{tag}"),
                   "registry" => config.data.fetch("registry"), "toolkit_version" => VERSION,
                   "contract" => CONTRACT, "workflow_ref" => ENV.fetch("GITHUB_WORKFLOW_REF", "local-rehearsal")}
+        unless repository.git("cat-file", "-t", "refs/tags/#{tag}") == "tag" && repository.git("rev-parse", "refs/tags/#{tag}^{}") == record.fetch("commit")
+          raise Error, "Artifact must be built from the annotated release commit"
+        end
         FileUtils.mkdir_p(directory)
         Dir.chdir(config.root) do
           spec = Gem::Specification.load("#{config.name}.gemspec")
           raise Error, "Gem version does not match verified tag" unless spec && "v#{spec.version}" == tag
           raise Error, "Package host differs from configuration" unless spec.metadata["allowed_push_host"] == record.fetch("registry").fetch("host")
+          spec.files.each do |file|
+            path = config.path(file)
+            if File.symlink?(path) || repository.git("hash-object", "--no-filters", "--", path) != repository.git("rev-parse", "#{record.fetch("commit")}:#{file}")
+              raise Error, "Package file differs from the release commit: #{file}"
+            end
+          end
+          repository.clean
+          raise Error, "Release checkout changed during package evaluation" unless repository.git("rev-parse", "HEAD") == record.fetch("commit")
           record["version"], record["platform"] = spec.version.to_s, spec.platform.to_s
           record["file"] = "#{spec.full_name}.gem"
           Gem::Package.build(spec, false, false, File.join(directory, record.fetch("file")))

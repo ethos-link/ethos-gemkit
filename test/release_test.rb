@@ -114,6 +114,9 @@ class ReleaseTest < GemkitTest
     assert_equal @git.git("rev-parse", "HEAD"), @git.git("--git-dir", @origin, "rev-parse", "main")
     assert_equal "tag", @git.git("cat-file", "-t", "refs/tags/v0.1.1")
     assert @release.verify_tag("v0.1.1").include?("fixture behavior")
+    File.write(File.join(@root, "README.md"), "Changed after tag verification")
+    assert_raises(Ethos::Gemkit::Error) { Ethos::Gemkit::Artifact.build(@config, tag: "v0.1.1", notes: "Untrusted") }
+    @git.git("restore", "README.md")
     record = Ethos::Gemkit::Artifact.build(@config, tag: "v0.1.1", notes: @release.verify_tag("v0.1.1"))
     artifact = Ethos::Gemkit::Artifact.new(File.join(@root, "pkg/release"))
     arguments = {repository: @data.fetch("repository"), tag: "v0.1.1", commit: record.fetch("commit"), name: "fixture", host: "https://rubygems.org", registry: @registry}
