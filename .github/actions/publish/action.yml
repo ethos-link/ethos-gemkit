@@ -65,3 +65,10 @@ runs:
         RELEASE_COMMIT: ${{ inputs.commit }}
         RELEASE_NAME: ${{ inputs.gem-name }}
       run: bundle exec ethos-gemkit artifact-publish --directory "$RELEASE_DIRECTORY" --repository "$RELEASE_REPOSITORY" --tag "$RELEASE_TAG" --commit "$RELEASE_COMMIT" --name "$RELEASE_NAME" --host https://rubygems.org
+    - name: Retain confirmed publication receipt
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      with:
+        name: publication-${{ inputs.commit }}-${{ github.run_id }}-${{ github.run_attempt }}
+        path: ${{ runner.temp }}/verified-release/publication.json
+        if-no-files-found: error
+        retention-days: 90

@@ -122,7 +122,8 @@ class ReleaseTest < GemkitTest
     arguments = {repository: @data.fetch("repository"), tag: "v0.1.1", commit: record.fetch("commit"), name: "fixture", host: "https://rubygems.org", registry: @registry}
     assert_includes artifact.publish(**arguments), "Published"
     assert_equal Digest::SHA256.hexdigest(@registry.uploads.first), record.fetch("sha256")
-    note_arguments = arguments.except(:registry)
+    assert_equal record.fetch("sha256"), JSON.parse(File.read(File.join(artifact.directory, "publication.json"))).fetch("sha256")
+    note_arguments = arguments
     success = Struct.new(:success?).new(true)
     failure = Struct.new(:success?).new(false)
     Open3.stub(:capture3, ->(*args) { (args[1..2] == %w[release list]) ? ["[]", "", success] : ["", "notes failed", failure] }) do
@@ -131,9 +132,12 @@ class ReleaseTest < GemkitTest
     Open3.stub(:capture3, ->(*args) { (args[1..2] == %w[release list]) ? ["[]", "", success] : ["", "", success] }) do
       assert_includes artifact.publish_notes(**note_arguments), "Created GitHub release"
     end
-    assert_raises(Ethos::Gemkit::Error) { artifact.verify(**note_arguments.merge(commit: "c" * 40)) }
-    assert_raises(Ethos::Gemkit::Error) { artifact.verify(**note_arguments.merge(host: "https://other.example")) }
+    assert_raises(Ethos::Gemkit::Error) { artifact.verify(**note_arguments.except(:registry).merge(commit: "c" * 40)) }
+    assert_raises(Ethos::Gemkit::Error) { artifact.verify(**note_arguments.except(:registry).merge(host: "https://other.example")) }
+    File.delete(File.join(artifact.directory, "publication.json"))
     assert_includes artifact.publish(**arguments), "recover notes only"
+    assert File.exist?(File.join(artifact.directory, "publication.json"))
+    assert_raises(Ethos::Gemkit::Error) { artifact.publish_notes(**note_arguments.merge(registry: MemoryRegistry.new)) }
     assert_equal 1, @registry.uploads.size
     File.open(artifact.package_path, "ab") { |file| file.write("tampered") }
     assert_raises(Ethos::Gemkit::Error) { artifact.publish(**arguments) }

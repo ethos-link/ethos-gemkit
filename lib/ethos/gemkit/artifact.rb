@@ -96,6 +96,7 @@ module Ethos
           unless existing["sha"] == record.fetch("sha256")
             raise Error, "Existing registry version has an unverified or different digest; do not republish"
           end
+          write_receipt
           return "Package already published with the verified digest; recover notes only"
         end
         registry.push(package_path)
@@ -108,12 +109,16 @@ module Ethos
         unless published && published["sha"] == record.fetch("sha256")
           raise Error, "Upload outcome is not confirmed; reconcile the registry before retrying"
         end
-        File.write(File.join(directory, "publication.json"), JSON.pretty_generate(record.slice("name", "version", "sha256", "tag", "commit")))
+        write_receipt
         "Published #{name} #{record.fetch("version")} with the verified digest"
       end
 
-      def publish_notes(repository:, tag:, commit:, name:, host:)
+      def publish_notes(repository:, tag:, commit:, name:, host:, registry: nil)
         verify(repository: repository, tag: tag, commit: commit, name: name, host: host)
+        registry ||= Registry.new(**record.fetch("registry").transform_keys(&:to_sym), name: name)
+        unless registry.version_info(record.fetch("version"))&.fetch("sha", nil) == record.fetch("sha256")
+          raise Error, "Confirm the matching published package before recovering release notes"
+        end
         output, _, status = Open3.capture3("gh", "release", "list", "--repo", repository, "--limit", "1000", "--json", "tagName")
         raise Error, "Cannot inspect GitHub releases" unless status.success?
         if JSON.parse(output).any? { |release| release.fetch("tagName") == tag }
@@ -128,6 +133,10 @@ module Ethos
           "--notes-file", File.join(directory, "release-notes.md"))
         raise Error, "GitHub release failed; retry notes using the same artifact" unless status.success?
         "Created GitHub release #{tag}"
+      end
+
+      def write_receipt
+        File.write(File.join(directory, "publication.json"), JSON.pretty_generate(record.merge("publication_status" => "confirmed")))
       end
 
       def package_path
