@@ -1,5 +1,10 @@
 name: Gem release
 on:
+  push:
+    tags: ["v*"]
+  pull_request:
+    types: [closed]
+    branches: [main]
   workflow_call:
     inputs:
       rubygems-owner:
@@ -17,16 +22,23 @@ concurrency:
   cancel-in-progress: false
 jobs:
   build:
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    if: >-
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+      (github.event_name == 'pull_request' && github.event.action == 'closed' &&
+      github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.event.pull_request.head.ref, 'chore/release-v'))
     runs-on: ubuntu-24.04
     outputs:
       gem: ${{ steps.build.outputs.gem }}
       host: ${{ steps.build.outputs.host }}
       tag: ${{ steps.build.outputs.tag }}
+      commit: ${{ steps.build.outputs.commit }}
+      from-pr: ${{ github.event_name == 'pull_request' }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
           fetch-depth: 0
           persist-credentials: false
       - uses: ruby/setup-ruby@de492cf36cbab201753d720ce4f4e336cd688c94 # v1
@@ -41,20 +53,52 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_BRANCH: ${{ github.event.pull_request.head.ref }}
+          RELEASE_FROM_PR: ${{ github.event_name == 'pull_request' }}
+          RELEASE_COMMIT: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
         run: |
           gh auth setup-git --hostname github.com
+          if [[ "$RELEASE_FROM_PR" == true ]]; then
+            export RELEASE_TAG="${RELEASE_BRANCH#chore/release-}"
+            [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          fi
           bundle exec rake release:build
+          echo "commit=$RELEASE_COMMIT" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: gem-${{ github.sha }}
+          name: gem-${{ steps.build.outputs.commit }}
           path: |
             pkg/${{ steps.build.outputs.gem }}
             pkg/release-notes.md
             pkg/SHA256SUMS
           if-no-files-found: error
           retention-days: 90
-  publish:
+  tag:
     needs: build
+    if: needs.build.outputs.from-pr == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ needs.build.outputs.commit }}
+          fetch-depth: 0
+      - name: Tag the verified release merge commit
+        env:
+          RELEASE_TAG: ${{ needs.build.outputs.tag }}
+          RELEASE_COMMIT: ${{ needs.build.outputs.commit }}
+        run: |
+          if git rev-parse --verify "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+            test "$(git cat-file -t "refs/tags/$RELEASE_TAG")" = tag
+            test "$(git rev-parse "refs/tags/$RELEASE_TAG^{}")" = "$RELEASE_COMMIT"
+          else
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' tag -a "$RELEASE_TAG" "$RELEASE_COMMIT" -m "Release $RELEASE_TAG"
+          fi
+          git -c core.hooksPath=/dev/null push --no-follow-tags origin "refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG"
+  publish:
+    needs: [build, tag]
+    if: always() && needs.build.result == 'success' && (needs.tag.result == 'success' || needs.tag.result == 'skipped')
     runs-on: ubuntu-24.04
     environment: rubygems
     permissions:
@@ -66,12 +110,12 @@ jobs:
           ruby-version: '4.0.9'
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: gem-${{ github.sha }}
+          name: gem-${{ needs.build.outputs.commit }}
       - run: sha256sum --check --strict SHA256SUMS
       - if: needs.build.outputs.host == 'https://rubygems.org'
         uses: ethos-link/configure-rubygems-credentials@9b2cf2e75bb26157e8b9909ce82f2736929cc571
         with:
-          owner: ${{ inputs.rubygems-owner }}
+          owner: ${{ inputs.rubygems-owner || vars.RUBYGEMS_OWNER }}
       - name: Push the exact verified package with native RubyGems
         env:
           GEM_FILE: ${{ needs.build.outputs.gem }}
@@ -91,7 +135,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: gem-${{ github.sha }}
+          name: gem-${{ needs.build.outputs.commit }}
       - run: sha256sum --check --strict SHA256SUMS
       - name: Create release notes from the verified artifact
         env:

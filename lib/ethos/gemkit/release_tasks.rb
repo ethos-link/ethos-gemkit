@@ -4,15 +4,15 @@ require_relative "tasks"
 require_relative "release"
 
 config = Ethos::Gemkit::Configuration.load
-desc "Prepare version and changelog changes for a normal pull request"
+desc "Create a verified release PR from clean, up-to-date main"
 task "release:prepare", [:target] do |_task, args|
-  puts Ethos::Gemkit::Release.new(config).prepare(args[:target])
+  puts Ethos::Gemkit::Release.new(config).prepare(args[:target] || "patch")
 end
 
-desc "Verify a canonical release tag and build using Bundler's native task"
+desc "Verify release source and build using Bundler's native task"
 task "release:build" => :verify do
   release = Ethos::Gemkit::Release.new(config)
-  notes = release.verify(ENV.fetch("RELEASE_TAG"))
+  notes = release.verify(ENV.fetch("RELEASE_TAG"), tagged: ENV["RELEASE_FROM_PR"] != "true")
   Rake::Task[:build].invoke
   File.write(config.path("pkg/release-notes.md"), notes)
   Dir.chdir(config.path("pkg")) do

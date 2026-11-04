@@ -19,7 +19,12 @@ class WorkflowTest < GemkitTest
     assert_equal "read", jobs.fetch("publish").fetch("permissions").fetch("contents")
     assert_equal "write", jobs.fetch("notes").fetch("permissions").fetch("contents")
     assert_includes jobs.fetch("build").fetch("if"), "github.event_name == 'push'"
-    assert_equal "${{ github.sha }}", jobs.fetch("build").fetch("steps").first.fetch("with").fetch("ref")
+    assert_includes jobs.fetch("build").fetch("steps").first.fetch("with").fetch("ref"), "pull_request.merge_commit_sha"
+    assert_includes jobs.fetch("build").fetch("if"), "pull_request.merged == true"
+    assert_includes jobs.fetch("build").fetch("if"), "chore/release-v"
+    assert_equal ["build", "tag"], jobs.fetch("publish").fetch("needs")
+    assert_equal "write", jobs.fetch("tag").fetch("permissions").fetch("contents")
+    assert jobs.fetch("tag").fetch("steps").none? { |step| step.fetch("run", "").include?("bundle") }
   end
 
   def test_private_publication_requires_a_token_and_uses_the_private_host
