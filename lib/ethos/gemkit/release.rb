@@ -106,7 +106,8 @@ module Ethos
       end
 
       def clean
-        raise Error, "Release requires a clean working tree" unless git("status", "--porcelain").empty?
+        status = git("status", "--porcelain")
+        raise Error, "Release requires a clean working tree:\n#{status}" unless status.empty?
       end
 
       def git(*arguments)
