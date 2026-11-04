@@ -7,13 +7,18 @@ belongs in the development/test Gemfile, never a consumer's runtime gemspec.
 Install the published gem in the development/test Gemfile:
 
 ```ruby
-gem "ethos-gemkit", "0.1.0", group: [:development, :test], require: false
+gem "ethos-gemkit", "0.2.0", group: [:development, :test], require: false
 ```
 
-Pin workflow callers to the matching release commit. Version 0.1.0 uses
-`e1be29225c48563f3725edaaca5401639c0de119`; keep that full SHA in Actions references
-and upgrade the gem version and workflow pins together. See the
-[Cloudflare Tunnel migration](https://github.com/ethos-link/cloudflare-tunnel/pull/4).
+Pin workflow callers to the full commit behind the installed Gemkit release tag.
+Resolve that commit with:
+
+```sh
+git ls-remote https://github.com/ethos-link/ethos-gemkit.git 'refs/tags/v0.2.0^{}'
+```
+
+Upgrade the gem version and workflow pins together. Consumer READMEs should cover
+their own APIs and checks, then link here for shared setup and release details.
 
 A standard gem needs this Rakefile:
 
@@ -69,18 +74,25 @@ Ordinary feature/fix PRs run verification; only a release PR starts publication.
 - A new gem also needs a pending trusted publisher. Supply its numeric RubyGems
   owner through the caller's `rubygems-owner` input or the repository/organization
   variable `RUBYGEMS_OWNER` (the publisher account used by Tunnel is `27209`).
-- Private gems: set the GitHub Packages registry profile and pass a scoped
-  `PACKAGES_TOKEN` secret to the release workflow. The two profiles use the same
-  native `gem push` with their respective host and credentials.
-- Configure the `rubygems` GitHub environment to allow releases from `main` and
-  `v*` tags. Grant the release workflow contents-write and id-token-write
-  permissions; repository rules must permit its release tags.
+- Private gems: set `registry: github_packages`. Publishing uses the workflow's
+  short-lived `GITHUB_TOKEN`; the package must grant its repository Actions access.
+  Pass `PACKAGES_TOKEN` only when an explicit token override is needed. Local
+  installation from other private repositories still needs `read:packages` access.
+- Configure the `rubygems` GitHub environment to allow `main` and `v*` tags.
+  Release callers grant `contents: write`, `id-token: write` and `packages: write`.
+  Repository rules must permit the workflow's annotated release tags.
 
 The SDK release workflow listens directly for merged release PRs and version-tag
 pushes. Consumer callers must listen for both `pull_request: types: [closed]`
 against `main` and `push: tags: ["v*"]`, and pin the commit matching the installed
 Gemkit release.
 See the [Tunnel caller](https://github.com/ethos-link/cloudflare-tunnel/blob/main/.github/workflows/release.yml).
+
+Projects keep their own checks. Engines can register `checks: [ci:local]` in
+`.ethos-gemkit.yml` and have that task run `bin/ci`. Set the release caller's
+optional `build-setup` input to provision those checks' dependencies, such as
+PostgreSQL or browser packages. Setup runs only in the read-only build job;
+publishing credentials remain in the separate publish job.
 
 ### RubyGems trusted-publisher settings
 
@@ -164,8 +176,9 @@ start another workflow. Existing manually pushed annotated version tags remain a
 supported trigger and receive full canonical-tag verification.
 
 Publish and notes jobs never check out or evaluate consumer code. Public gems
-use short-lived OIDC credentials; private gems use the supplied scoped token.
-No registry fallback exists. Live private publication still needs a private pilot.
+use short-lived OIDC credentials; private gems use the workflow token or an
+explicit override. Both profiles push the same verified artifact to their
+configured host; no registry fallback exists.
 
 ### Failures and retries
 
@@ -210,3 +223,16 @@ divergence; live SSH credentials and host keys still require target validation.
 Develop with `bundle install` and `bundle exec rake verify`. Release and registry
 fixtures live in tests, using real Git and native gem builds with fake network
 publishers. No production rehearsal command or registry client is required.
+
+## Built by Ethos Link
+
+[Ethos Link](https://www.ethos-link.com) builds business software and integrations
+that replace manual handoffs with connected workflows. We help teams automate
+routine work, use their data and improve the processes their business runs on.
+
+- [Reviato](https://www.reviato.com): Read public review trends and collect
+  private customer feedback, so your team can decide what to improve.
+- [EthosPlaces](https://www.ethos.place): Give customers the details they need to
+  choose and visit your business, from opening hours to directions.
+- [Nuntio](https://www.nuntiohq.com): Draft, review and schedule social posts in
+  one workspace, then track each publishing result.

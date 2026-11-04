@@ -17,7 +17,12 @@ class WorkflowTest < GemkitTest
     end
     assert_equal ["build", "publish"], jobs.fetch("notes").fetch("needs")
     assert_equal "read", jobs.fetch("publish").fetch("permissions").fetch("contents")
+    assert_equal "write", jobs.fetch("publish").fetch("permissions").fetch("packages")
+    assert_equal "${{ secrets.PACKAGES_TOKEN || github.token }}", jobs.fetch("publish").fetch("steps").last.fetch("env").fetch("PACKAGES_TOKEN")
     assert_equal "write", jobs.fetch("notes").fetch("permissions").fetch("contents")
+    setup = jobs.fetch("build").fetch("steps").find { |step| step["name"] == "Set up consumer verification dependencies" }
+    assert_equal "${{ inputs.build-setup }}", setup.fetch("run")
+    assert_equal "inputs.build-setup != ''", setup.fetch("if")
     assert_includes jobs.fetch("build").fetch("if"), "github.event_name == 'push'"
     assert_includes jobs.fetch("build").fetch("steps").first.fetch("with").fetch("ref"), "pull_request.merge_commit_sha"
     assert_includes jobs.fetch("build").fetch("if"), "pull_request.merged == true"

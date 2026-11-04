@@ -7,13 +7,17 @@ on:
     branches: [main]
   workflow_call:
     inputs:
+      build-setup:
+        description: Optional command to provision build-only verification dependencies
+        type: string
+        default: ''
       rubygems-owner:
         description: Numeric RubyGems owner for pending trusted publishers
         type: string
         default: ''
     secrets:
       PACKAGES_TOKEN:
-        description: GitHub Packages write token, only for the private host
+        description: Optional GitHub Packages token override; defaults to the workflow token
         required: false
 permissions:
   contents: read
@@ -49,6 +53,9 @@ jobs:
       - uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 # v2
         with:
           tool: git-cliff@2.12.0
+      - name: Set up consumer verification dependencies
+        if: inputs.build-setup != ''
+        run: ${{ inputs.build-setup }}
       - id: build
         env:
           GH_TOKEN: ${{ github.token }}
@@ -104,6 +111,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      packages: write
     steps:
       - uses: ruby/setup-ruby@de492cf36cbab201753d720ce4f4e336cd688c94 # v1
         with:
@@ -120,7 +128,7 @@ jobs:
         env:
           GEM_FILE: ${{ needs.build.outputs.gem }}
           GEM_HOST: ${{ needs.build.outputs.host }}
-          PACKAGES_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
+          PACKAGES_TOKEN: ${{ secrets.PACKAGES_TOKEN || github.token }}
         run: |
           if [[ "$GEM_HOST" == https://rubygems.pkg.github.com/ethos-link ]]; then
             test -n "$PACKAGES_TOKEN"
