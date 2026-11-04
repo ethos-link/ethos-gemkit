@@ -11,6 +11,7 @@ commit; the toolkit has not been published. See the working
 A standard gem needs this Rakefile:
 
 ```ruby
+require "bundler/setup"
 require "ethos/gemkit/rake"
 ```
 
