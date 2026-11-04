@@ -23,6 +23,8 @@ Gem::Specification.new do |spec|
   spec.bindir = "exe"
   spec.executables = ["ethos-gemkit"]
   spec.require_paths = ["lib"]
+  spec.add_dependency "json", ">= 2.0", "< 4"
+  spec.add_dependency "net-http", ">= 0.9", "< 1"
   spec.add_dependency "standard", "~> 1.57"
   spec.add_dependency "standard-rails", "~> 1.6"
   spec.add_dependency "lint_roller", "~> 1.1"

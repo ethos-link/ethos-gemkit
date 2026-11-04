@@ -6,7 +6,7 @@ require_relative "../gemkit"
 module Ethos
   module Gemkit
     class Configuration
-      KEYS = %w[schema_version workflow_contract gem_name repository default_branch version_file metadata_files release_mode registry checks].freeze
+      KEYS = %w[schema_version workflow_contract gem_name repository default_branch version_file metadata_files release_mode registry checks gitlab_url].freeze
       REGISTRIES = {"rubygems" => "https://rubygems.org", "github_packages" => "https://rubygems.pkg.github.com/ethos-link"}.freeze
 
       attr_reader :root, :data
@@ -30,6 +30,11 @@ module Ethos
 
       def checks
         data.fetch("checks")
+      end
+
+      def gitlab_url
+        value = data["gitlab_url"]
+        (value.nil? || value.strip.empty?) ? nil : value.strip
       end
 
       def path(relative)
@@ -60,6 +65,11 @@ module Ethos
         require_value(data["schema_version"] == 1 && data["workflow_contract"] == CONTRACT, "Unsupported schema/workflow contract")
         require_value(name.is_a?(String) && name.match?(/\A[a-z0-9][a-z0-9_-]*\z/), "Invalid gem name")
         require_value(data["repository"].is_a?(String) && data["repository"].match?(/\A[a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+\z/), "Expected GitHub owner/repository")
+        require_value(data["gitlab_url"].nil? || data["gitlab_url"].is_a?(String), "gitlab_url must be a repository URL or blank")
+        if gitlab_url
+          require_relative "gitlab_sync"
+          GitlabSync.validate_url(gitlab_url)
+        end
         require_value(data["default_branch"] == "main", "Canonical branch must be main")
         require_value(%w[staged atomic].include?(data["release_mode"]), "Invalid release mode")
         path(data.fetch("version_file"))

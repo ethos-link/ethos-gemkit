@@ -1,0 +1,82 @@
+name: Optional GitLab main sync
+on:
+  workflow_call:
+    inputs:
+      toolkit-ref:
+        description: Immutable toolkit revision, matching this workflow reference
+        type: string
+        required: true
+    secrets:
+      GITLAB_DEPLOY_KEY:
+        required: false
+      GITLAB_KNOWN_HOSTS:
+        required: false
+permissions:
+  contents: read
+concurrency:
+  group: gitlab-main-${{ github.repository }}
+  cancel-in-progress: false
+jobs:
+  configuration:
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-24.04
+    outputs:
+      url: ${{ steps.config.outputs.url }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          repository: ethos-link/ethos-gemkit
+          ref: ${{ inputs.toolkit-ref }}
+          path: .gemkit
+          persist-credentials: false
+      - uses: ruby/setup-ruby@de492cf36cbab201753d720ce4f4e336cd688c94 # v1
+        with:
+          ruby-version: '4.0.9'
+          bundler: '4.0.11'
+      - run: BUNDLE_GEMFILE="$PWD/.gemkit/Gemfile" BUNDLE_FROZEN=true bundle install
+      - id: config
+        env:
+          BUNDLE_GEMFILE: ${{ github.workspace }}/.gemkit/Gemfile
+        run: echo "url=$(bundle exec ethos-gemkit gitlab-url)" >> "$GITHUB_OUTPUT"
+  sync:
+    needs: configuration
+    if: needs.configuration.outputs.url != ''
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          repository: ethos-link/ethos-gemkit
+          ref: ${{ inputs.toolkit-ref }}
+          path: .gemkit
+          persist-credentials: false
+      - uses: ruby/setup-ruby@de492cf36cbab201753d720ce4f4e336cd688c94 # v1
+        with:
+          ruby-version: '4.0.9'
+          bundler: '4.0.11'
+      - run: BUNDLE_GEMFILE="$PWD/.gemkit/Gemfile" BUNDLE_FROZEN=true bundle install
+      - name: Sync with scoped key and pinned host keys
+        env:
+          BUNDLE_GEMFILE: ${{ github.workspace }}/.gemkit/Gemfile
+          GITLAB_DEPLOY_KEY: ${{ secrets.GITLAB_DEPLOY_KEY }}
+          GITLAB_KNOWN_HOSTS: ${{ secrets.GITLAB_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$GITLAB_DEPLOY_KEY"
+          test -n "$GITLAB_KNOWN_HOSTS"
+          key_directory=$(mktemp -d)
+          trap 'rm -rf "$key_directory"' EXIT
+          chmod 700 "$key_directory"
+          printf '%s\n' "$GITLAB_DEPLOY_KEY" > "$key_directory/key"
+          printf '%s\n' "$GITLAB_KNOWN_HOSTS" > "$key_directory/known_hosts"
+          chmod 600 "$key_directory/key" "$key_directory/known_hosts"
+          export GIT_SSH_COMMAND="ssh -i $key_directory/key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$key_directory/known_hosts -o BatchMode=yes"
+          bundle exec ethos-gemkit gitlab-sync >> "$GITHUB_STEP_SUMMARY"

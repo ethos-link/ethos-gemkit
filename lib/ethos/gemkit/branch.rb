@@ -10,6 +10,10 @@ module Ethos
         output, error, status = Open3.capture3("git", "branch", "--show-current", chdir: root)
         raise Error, "Cannot inspect Git branch: #{error.strip}" unless status.success?
         branch = output.strip
+        if branch == "main" && ENV["ETHOS_GEMKIT_RELEASE_VERSION"]
+          require_relative "release"
+          return Release.new(Configuration.load(root)).guard_staged(ENV.fetch("ETHOS_GEMKIT_RELEASE_VERSION"))
+        end
         if branch.empty? || %w[main master].include?(branch)
           raise Error, "Use a feature branch; direct commits to main/master or detached HEAD are blocked"
         end
