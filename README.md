@@ -46,9 +46,13 @@ build, and git-cliff validation.
 **Run `release:prepare` from clean, up-to-date `main`.** It creates the conventional
 release branch and opens a PR. **Merging that release PR starts publication.**
 This is the same process for Gemkit itself and its adopted consumer gems.
+Ordinary feature/fix PRs run verification; only a release PR starts publication.
 
 ### One-time prerequisites
 
+- Ignore `/.bundle/`, `/vendor/bundle/` and `/pkg/` in `.gitignore`. The shared
+  workflows use Ruby setup's native `vendor/bundle` cache; generated files must
+  leave the release checkout clean.
 - Install the bundle, Git, git-cliff and GitHub CLI. Configure your Git identity,
   authenticate with `gh auth login`, and install hooks with
   `bundle exec lefthook install`. You need permission to push branches and open PRs.
@@ -101,6 +105,8 @@ changelog, runs `bundle lock --local` and the full `rake verify`, then commits t
 three metadata files with hooks enabled, pushes the branch, and opens a
 `chore(release): prepare vX.Y.Z` PR. Main stays unchanged. You can also start on
 that exact pre-created release branch if its HEAD still equals `origin/main`.
+When starting from main, a leftover local release branch is recreated only if
+all its commits are already in main; unmerged work is preserved and stops the task.
 
 Review the generated notes, lockfile and version in the PR. Add or adjust upgrade
 notes in a follow-up commit when needed, and wait for CI before merging. The task

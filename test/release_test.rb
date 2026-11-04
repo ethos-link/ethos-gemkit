@@ -29,7 +29,7 @@ class ReleaseTest < GemkitTest
     File.write(File.join(@root, "Gemfile"), "source \"https://rubygems.org\"\ngemspec\ngem \"ethos-gemkit\", path: #{TOOLKIT.inspect}, require: false\n")
     File.write(File.join(@root, "Rakefile"), "require \"rake\"\ntask :test\nrequire \"ethos/gemkit/rake\"\n")
     File.write(File.join(@root, ".standard.yml"), "ruby_version: \"4.0\"\nplugins:\n  - ethos-gemkit\n")
-    File.write(File.join(@root, ".gitignore"), "/pkg/\n")
+    FileUtils.cp(File.join(TOOLKIT, ".gitignore"), File.join(@root, ".gitignore"))
     File.write(File.join(@root, "CHANGELOG.md"), "## [0.1.0]\n\n- Existing package.\n")
     FileUtils.cp(File.join(TOOLKIT, "cliff.toml"), File.join(@root, "cliff.toml"))
     command("git", "init", "--bare", @origin)
@@ -89,6 +89,7 @@ class ReleaseTest < GemkitTest
     git("config", "push.followTags", "true")
     git("tag", "-a", "local-backup", "-m", "Unrelated tag")
     before = git("rev-parse", "HEAD")
+    git("branch", "chore/release-v0.1.1", "v0.1.0^{}") # Already merged preparation from a failed release.
     output = command("bundle", "exec", "rake", "release:prepare[patch]")
     assert_includes output, "https://github.com/ethos-link/fixture/pull/1"
     assert_includes output, "Merge this release PR"
@@ -102,6 +103,8 @@ class ReleaseTest < GemkitTest
     git("switch", "main")
     git("merge", "--ff-only", "chore/release-v0.1.1")
     git("push", "--no-follow-tags", "origin", "main")
+    FileUtils.mkdir_p(File.join(@root, "vendor/bundle"))
+    File.write(File.join(@root, "vendor/bundle/cached-gem"), "CI dependency cache\n")
     command("bundle", "exec", "rake", "release:build", environment: {"RELEASE_TAG" => "v0.1.1", "RELEASE_FROM_PR" => "true"})
     workflow = YAML.safe_load_file(File.join(TOOLKIT, ".github/workflows/release.yml"))
     tag = workflow.fetch("jobs").fetch("tag").fetch("steps").last.fetch("run")
@@ -165,6 +168,16 @@ class ReleaseTest < GemkitTest
     assert_includes command("bundle", "exec", "rake", "release:prepare[patch]", success: false), "origin/main"
     assert_empty git("status", "--porcelain")
     assert_equal "0.1.0", File.read(File.join(@root, "lib/fixture/version.rb"))[/VERSION = "([^"]+)"/, 1]
+    git("merge", "--ff-only", "feature/release")
+    git("switch", "-c", "chore/release-v0.1.1")
+    File.write(File.join(@root, "README.md"), "Unmerged release work\n")
+    git("add", "README.md")
+    git("commit", "-m", "docs: preserve unmerged release work")
+    unmerged = git("rev-parse", "HEAD")
+    git("switch", "main")
+    assert_includes command("bundle", "exec", "rake", "release:prepare[patch]", success: false), "contains unmerged commits"
+    assert_equal unmerged, git("rev-parse", "chore/release-v0.1.1")
+    assert_empty git("status", "--porcelain")
   end
 
   def test_initial_untagged_version_can_be_prepared_without_incrementing_it
