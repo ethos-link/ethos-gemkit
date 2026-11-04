@@ -35,7 +35,7 @@ runs:
       with:
         name: release-${{ inputs.commit }}
         path: ${{ runner.temp }}/verified-release
-        run-id: ${{ inputs.run-id }}
+        run-id: ${{ inputs.run-id || github.run_id }}
         github-token: ${{ inputs.github-token }}
     - name: Create or reconcile GitHub release
       shell: bash
