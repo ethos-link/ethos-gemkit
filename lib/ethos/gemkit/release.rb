@@ -107,7 +107,7 @@ module Ethos
         else
           repository.git("tag", "-a", tag, "-m", "Release #{tag}")
         end
-        repository.git("push", "origin", "refs/tags/#{tag}:refs/tags/#{tag}")
+        repository.git("push", "--no-follow-tags", "origin", "refs/tags/#{tag}:refs/tags/#{tag}")
         raise Error, "Remote tag identity differs after push" unless repository.remote_tag(tag) == repository.git("rev-parse", "refs/tags/#{tag}")
         clear_journal
         "Tagged and pushed #{tag}; GitHub Actions publishes"
@@ -222,12 +222,12 @@ module Ethos
             else
               repository.git("tag", "-a", tag, "-m", "Release #{tag}")
             end
-            repository.git("push", "--atomic", "origin", "HEAD:refs/heads/main", "refs/tags/#{tag}:refs/tags/#{tag}")
+            repository.git("push", "--no-follow-tags", "--atomic", "origin", "HEAD:refs/heads/main", "refs/tags/#{tag}:refs/tags/#{tag}")
           end
           clear_journal
           "Prepared and atomically pushed #{tag}; GitHub Actions publishes"
         else
-          repository.git("push", "origin", "HEAD:refs/heads/main")
+          repository.git("push", "--no-follow-tags", "origin", "HEAD:refs/heads/main")
           @state["stage"] = "staged"
           save
           "Prepared v#{@state.fetch("version")}; run release:tag after reviewing metadata"

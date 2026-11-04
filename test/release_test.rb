@@ -106,12 +106,16 @@ class ReleaseTest < GemkitTest
   end
 
   def test_staged_release_keeps_hooks_and_publishes_the_same_verified_artifact
+    @git.git("config", "push.followTags", "true")
+    @git.git("tag", "-a", "local-backup", "-m", "Unrelated local tag")
     assert_includes prepare, "run release:tag"
     assert_equal "0.1.1", @release.current_version
     assert_equal "", @git.git("tag", "--list", "v0.1.1")
     assert File.exist?(@git.journal)
+    assert_nil @git.remote_tag("local-backup")
     assert_includes @release.tag, "Tagged and pushed"
     assert_equal @git.git("rev-parse", "HEAD"), @git.git("--git-dir", @origin, "rev-parse", "main")
+    assert_nil @git.remote_tag("local-backup")
     assert_equal "tag", @git.git("cat-file", "-t", "refs/tags/v0.1.1")
     assert @release.verify_tag("v0.1.1").include?("fixture behavior")
     File.write(File.join(@root, "README.md"), "Changed after tag verification")
