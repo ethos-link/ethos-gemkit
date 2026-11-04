@@ -63,14 +63,12 @@ Ordinary feature/fix PRs run verification; only a release PR starts publication.
 - Install the bundle, Git, git-cliff and GitHub CLI. Configure your Git identity,
   authenticate with `gh auth login`, and install hooks with
   `bundle exec lefthook install`. You need permission to push branches and open PRs.
-- Public gems: configure RubyGems trusted publishing for the gem. Use environment
-  `rubygems`, workflow filename `release.yml`, and the consumer owner/repository.
-  For a consumer such as Tunnel, set workflow repository owner `ethos-link` and
-  workflow repository `ethos-gemkit`. For Gemkit's own publisher, leave those
-  optional workflow-repository fields blank because it is the same repository.
+- Public gems: configure a matching RubyGems trusted publisher for **each gem**
+  before merging its first release PR. Use the exact settings below. Gemkit's
+  publisher does not authorize consumer gems.
 - A new gem also needs a pending trusted publisher. Supply its numeric RubyGems
   owner through the caller's `rubygems-owner` input or the repository/organization
-  variable `RUBYGEMS_OWNER` (the Ethos account used by Tunnel is `27209`).
+  variable `RUBYGEMS_OWNER` (the publisher account used by Tunnel is `27209`).
 - Private gems: set the GitHub Packages registry profile and pass a scoped
   `PACKAGES_TOKEN` secret to the release workflow. The two profiles use the same
   native `gem push` with their respective host and credentials.
@@ -82,7 +80,32 @@ The SDK release workflow listens directly for merged release PRs and version-tag
 pushes. Consumer callers must listen for both `pull_request: types: [closed]`
 against `main` and `push: tags: ["v*"]`, and pin the commit matching the installed
 Gemkit release.
-See the [Tunnel caller](https://github.com/ethos-link/cloudflare-tunnel/blob/feat/ethos-gemkit/.github/workflows/release.yml).
+See the [Tunnel caller](https://github.com/ethos-link/cloudflare-tunnel/blob/main/.github/workflows/release.yml).
+
+### RubyGems trusted-publisher settings
+
+On RubyGems, open the **consumer gem's** page, then **Trusted publishers**. For
+Cloudflare Tunnel, create or update the publisher with these exact values:
+
+| RubyGems field | Value |
+|---|---|
+| Repository owner | `ethos-link` |
+| Repository name | `cloudflare-tunnel` |
+| Workflow filename | `release.yml` |
+| Environment | `rubygems` |
+| Workflow Repository Owner | `ethos-link` |
+| Workflow Repository Name | `ethos-gemkit` |
+
+The repository identifies the consumer; the Workflow Repository fields identify
+the repository containing the shared workflow file. Those last two fields are
+required for consumers,
+even though RubyGems labels them optional. For another consumer, substitute its
+repository name. For Gemkit itself, use repository name `ethos-gemkit` and leave
+both Workflow Repository fields blank because the workflow is in the same repo.
+
+The numeric `rubygems-owner` input identifies the account for pending publishers;
+it does not register a publisher or grant access to a consumer gem. See the
+[upstream reusable-workflow instructions](https://guides.rubygems.org/trusted-publishing/#using-reusable-workflows).
 
 ### Prepare and review
 
@@ -152,6 +175,17 @@ Fix and finish that ordinary branch, or restore the changes before starting over
 If the commit/push succeeded but opening the PR failed, use
 `gh pr create --base main --head chore/release-vX.Y.Z --fill` after fixing access.
 There is no journal or automatic reset of your working tree.
+
+If credential setup fails with `No trusted publisher configured for this workflow`,
+check the consumer's RubyGems settings against the table above. A successful
+build and tag do not mean the gem was published. When `gem push` was skipped,
+correct the publisher settings, then rerun **failed jobs only** in the original
+workflow run. This reuses its verified artifact and existing tag; do not run
+`release:prepare` again, bump the version or replace the tag for this failure.
+
+```sh
+gh run rerun RUN_ID --repo OWNER/REPOSITORY --failed
+```
 
 For CI failures, retry **failed jobs in the original run** within GitHub's 30-day
 retry window. Artifacts are retained for 90 days. A failed tag step can reuse an
