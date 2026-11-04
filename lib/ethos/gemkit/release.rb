@@ -18,8 +18,10 @@ module Ethos
 
       # Release metadata uses an ordinary branch and PR; main is never committed.
       def prepare(target = "patch")
+        progress "Checking working tree and repository"
         clean
         canonical_origin
+        progress "Fetching origin/main"
         git("fetch", "--no-tags", "origin", "refs/heads/main:refs/remotes/origin/main")
         unless git("rev-parse", "HEAD") == git("rev-parse", "origin/main")
           raise Error, "Start from clean main at origin/main; fetch and fast-forward before preparing a release"
@@ -43,13 +45,16 @@ module Ethos
         end
         literal = %(VERSION = "#{current}")
         raise Error, "Expected a literal #{literal} in version_file" unless text.include?(literal)
+        progress "Checking release tag v#{target}"
         raise Error, "Release tag already exists" unless git("tag", "--list", "v#{target}").empty? && git("ls-remote", "--tags", "origin", "refs/tags/v#{target}").empty?
         branch = "chore/release-v#{target}"
         current_branch = git("branch", "--show-current")
         unless ["main", branch].include?(current_branch)
           raise Error, "Start from main or #{branch} at origin/main"
         end
+        progress "Checking GitHub authentication"
         run("gh", "auth", "status", "--hostname", "github.com")
+        progress "Preparing #{branch}"
         if current_branch == "main"
           unless git("branch", "--list", branch).empty?
             unless git("rev-list", "--count", "origin/main..#{branch}") == "0"
@@ -60,20 +65,26 @@ module Ethos
           git("switch", "-c", branch)
         end
         Branch.check(@config.root)
+        progress "Updating version and changelog to #{target}"
         File.write(file, text.sub(literal, %(VERSION = "#{target}")))
-        run("git-cliff", "--config", "cliff.toml", "--unreleased", "--tag", "v#{target}", "--prepend", "CHANGELOG.md")
-        run("bundle", "lock", "--local")
-        run("bundle", "exec", "rake", "verify")
+        run("git-cliff", "--config", "cliff.toml", "--unreleased", "--tag", "v#{target}", "--prepend", "CHANGELOG.md", live: true)
+        progress "Updating Gemfile.lock"
+        run("bundle", "lock", "--local", live: true)
+        progress "Running verification (lint, tests, package, changelog)"
+        run("bundle", "exec", "rake", "verify", live: true)
         files = [@config.data.fetch("version_file"), "CHANGELOG.md", "Gemfile.lock"]
         unless (git("diff", "--name-only").lines.map(&:strip) - files).empty? && git("ls-files", "--others", "--exclude-standard").empty?
           raise Error, "Verification changed unrelated files; review git diff before committing"
         end
         title = "chore(release): prepare v#{target}"
         body = "Prepare #{spec.name} #{target} for publication.\n\nRecord the version, generated notes and lockfile after verification."
+        progress "Committing release metadata with hooks enabled"
         git("add", "--", *files)
-        git("commit", "-m", title, "-m", body)
+        run("git", "commit", "-m", title, "-m", body, live: true)
         clean
-        git("push", "--no-follow-tags", "--set-upstream", "origin", branch)
+        progress "Pushing #{branch}"
+        run("git", "push", "--no-follow-tags", "--set-upstream", "origin", branch, live: true)
+        progress "Opening release PR"
         url = run("gh", "pr", "create", "--repo", @config.data.fetch("repository"),
           "--base", "main", "--head", branch, "--title", title,
           "--body", "#{body}\n\nMerging this PR creates annotated tag v#{target} and publishes the verified gem.").strip
@@ -122,9 +133,19 @@ module Ethos
         run("git", *arguments).strip
       end
 
-      def run(*arguments)
+      def progress(message)
+        $stdout.puts "[release:prepare] #{message}..."
+        $stdout.flush
+      end
+
+      def run(*arguments, live: false)
         environment = {"BUNDLE_GEMFILE" => File.join(@config.root, "Gemfile"),
                        "GEM_PATH" => [*Gem.path, *Gem.loaded_specs.values.map(&:base_dir)].uniq.join(File::PATH_SEPARATOR)}
+        if live
+          success = Bundler.with_unbundled_env { system(environment, *arguments, chdir: @config.root) }
+          raise Error, "#{arguments.first(3).join(" ")} failed; see output above" unless success
+          return ""
+        end
         output, error, status = Bundler.with_unbundled_env { Open3.capture3(environment, *arguments, chdir: @config.root) }
         raise Error, "#{arguments.first(3).join(" ")} failed: #{output}#{error}" unless status.success?
         output

@@ -108,8 +108,9 @@ tag, an explicit current version is supported. For example, a new gem starting
 at 0.1.0 can use `bundle exec rake 'release:prepare[0.1.0]'` after pending-publisher
 setup.
 
-The task checks the working tree, canonical origin, current main, installed hooks
-and target tag. It creates `chore/release-vX.Y.Z`, updates the version and
+The task prints each step and streams command output as it runs. It checks the
+working tree, canonical origin, current main, installed hooks and target tag.
+It creates `chore/release-vX.Y.Z`, updates the version and
 changelog, runs `bundle lock --local` and the full `rake verify`, then commits the
 three metadata files with hooks enabled, pushes the branch, and opens a
 `chore(release): prepare vX.Y.Z` PR. Main stays unchanged. You can also start on
