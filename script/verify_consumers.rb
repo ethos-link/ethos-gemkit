@@ -9,9 +9,24 @@ require "open3"
 
 # Run against built gems, outside both the source checkout and development bundle.
 SMOKES = {
-  "indexmap" => ["indexmap", 'Indexmap::Entry.new(loc: "https://example.test/")'],
-  "crawlscope" => ["crawlscope", "Crawlscope.configuration"],
-  "cloudflare-tunnel" => ["cloudflare-tunnel", "Cloudflare::Tunnel.configuration"],
+  "indexmap" => ["indexmap", <<~RUBYCODE],
+    config = Indexmap::Configuration.new
+    config.base_url = "https://example.test"
+    config.format = :single_file
+    config.entries = [{loc: "https://example.test/"}]
+    config.storage = Indexmap::Storage::Memory.new
+    Indexmap.create(configuration: config)
+    abort "Sitemap generation failed" unless config.storage.read("sitemap.xml").include?("https://example.test/")
+  RUBYCODE
+  "crawlscope" => ["crawlscope", <<~RUBYCODE],
+    html = '<script type="application/ld+json">{"@type":"Hotel","name":"Example"}</script>'
+    document = Crawlscope::StructuredData::Document.new(html: html)
+    abort "Structured-data extraction failed" unless document.json_ld_items.first.fetch("name") == "Example"
+  RUBYCODE
+  "cloudflare-tunnel" => ["cloudflare-tunnel", <<~'RUBYCODE'],
+    signature = Cloudflare::Tunnel::Probe.signature("fixture-secret", "a" * 64)
+    abort "Probe signing failed" unless signature.match?(/\A[0-9a-f]{64}\z/)
+  RUBYCODE
   "ethosmark" => ["ethosmark", 'abort "rendering failed" unless Ethosmark::Renderer.new("## Hello").render.include?("Hello")'],
   "git-markdown" => ["git_markdown", "GitMarkdown::VERSION"],
   "ruby_llm-codex" => ["ruby_llm-codex", "RubyLLM::Codex::VERSION"],

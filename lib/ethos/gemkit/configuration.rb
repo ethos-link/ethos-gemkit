@@ -6,21 +6,30 @@ require_relative "../gemkit"
 module Ethos
   module Gemkit
     class Configuration
-      KEYS = %w[schema_version workflow_contract gem_name repository default_branch version_file metadata_files release_mode registry checks].freeze
+      KEYS = %w[gem_name repository version_file registry checks].freeze
       REGISTRIES = {"rubygems" => "https://rubygems.org", "github_packages" => "https://rubygems.pkg.github.com/ethos-link"}.freeze
 
       attr_reader :root, :data
 
       def self.load(root = Dir.pwd)
         path = File.join(root, ".ethos-gemkit.yml")
-        new(root, YAML.safe_load_file(path, permitted_classes: [], permitted_symbols: [], aliases: false))
+        new(root, File.exist?(path) ? YAML.safe_load_file(path, permitted_classes: [], permitted_symbols: [], aliases: false) : {})
       rescue Psych::Exception, Errno::ENOENT => error
         raise Error, "Cannot load .ethos-gemkit.yml: #{error.message}"
       end
 
       def initialize(root, data)
         @root = File.realpath(root)
-        @data = data
+        raise Error, "Configuration must be a mapping" unless data.is_a?(Hash)
+        gemspecs = Dir[File.join(@root, "*.gemspec")]
+        raise Error, "Expected exactly one gemspec, or an explicit gem_name" if !data["gem_name"] && !gemspecs.one?
+        name = data["gem_name"] || File.basename(gemspecs.first, ".gemspec")
+        versions = Dir[File.join(@root, "lib/**/version.rb")].reject { |file| file.include?("templates/") }
+        registry = data.fetch("registry", "rubygems")
+        registry = {"kind" => registry, "host" => REGISTRIES[registry]} if registry.is_a?(String)
+        @data = {"gem_name" => name,
+                 "repository" => "ethos-link/#{name}", "checks" => ["test"],
+                 "version_file" => versions.one? ? versions.first.delete_prefix(@root + "/") : "lib/#{name}/version.rb"}.merge(data).merge("registry" => registry)
         validate
       end
 
@@ -57,15 +66,9 @@ module Ethos
       def validate
         require_value(data.is_a?(Hash), "Configuration must be a mapping")
         require_value((data.keys - KEYS).empty?, "Unknown configuration keys: #{data.keys - KEYS}")
-        require_value(data["schema_version"] == 1 && data["workflow_contract"] == CONTRACT, "Unsupported schema/workflow contract")
         require_value(name.is_a?(String) && name.match?(/\A[a-z0-9][a-z0-9_-]*\z/), "Invalid gem name")
         require_value(data["repository"].is_a?(String) && data["repository"].match?(/\A[a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+\z/), "Expected GitHub owner/repository")
-        require_value(data["default_branch"] == "main", "Canonical branch must be main")
-        require_value(%w[staged atomic].include?(data["release_mode"]), "Invalid release mode")
         path(data.fetch("version_file"))
-        files = data["metadata_files"]
-        require_value(files.is_a?(Array) && !files.empty? && files.uniq == files, "metadata_files must be a unique nonempty array")
-        files.each { |file| path(file) }
         registry = data["registry"]
         require_value(registry.is_a?(Hash) && registry.keys.sort == %w[host kind], "registry requires only kind and host")
         require_value(REGISTRIES.key?(registry["kind"]) && registry["host"] == REGISTRIES[registry["kind"]], "Unsupported registry/host pair")

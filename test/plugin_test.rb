@@ -37,6 +37,17 @@ class PluginTest < GemkitTest
     end
   end
 
+  def test_rake_rejects_a_local_configuration_that_skips_shared_rules
+    in_fixture do |directory|
+      File.write(File.join(directory, "fixture.gemspec"), 'Gem::Specification.new { |spec| spec.name = "fixture"; spec.version = "1.0.0" }')
+      File.write(File.join(directory, ".standard.yml"), "ruby_version: \"4.0\"\n")
+      File.write(File.join(directory, "Rakefile"), 'require "ethos/gemkit/tasks"')
+      output, error, status = capture(directory, RbConfig.ruby, "-I", File.join(TOOLKIT, "lib"), "-S", "rake", "-T")
+      refute status.success?
+      assert_includes output + error, "register ethos-gemkit"
+    end
+  end
+
   def test_incompatible_components_fail_before_linting
     require "ethos/gemkit/plugin"
     spec = Struct.new(:name, :version)

@@ -8,7 +8,7 @@ Gem::Specification.new do |spec|
   spec.authors = ["Ethos Link"]
   spec.email = ["devel@ethos-link.com"]
   spec.summary = "Shared development and verification tooling for Ethos Link gems"
-  spec.description = "Common Ruby gem tasks, conditional Rails linting, package validation and development diagnostics."
+  spec.description = "Common Ruby gem tasks, conditional Rails linting, package validation and release verification."
   spec.homepage = "https://github.com/ethos-link/ethos-gemkit"
   spec.license = "MIT"
   spec.required_ruby_version = ">= 4.0"
@@ -27,6 +27,5 @@ Gem::Specification.new do |spec|
   spec.add_dependency "standard-rails", "~> 1.6"
   spec.add_dependency "lint_roller", "~> 1.1"
   spec.add_dependency "rake", "~> 13.0"
-  spec.add_dependency "commitlint", "~> 0.4"
   spec.add_dependency "lefthook", "~> 2.1"
 end

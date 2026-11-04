@@ -7,4 +7,4 @@ pre-commit:
 commit-msg:
   jobs:
     - name: commitlint
-      run: bundle exec commitlint --message {1}
+      run: bundle exec ethos-gemkit commitlint --message {1}

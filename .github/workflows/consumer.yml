@@ -1,19 +1,22 @@
-name: Changelog configuration
+name: Gem verification
 on:
-  pull_request:
-  push:
-    branches: [main]
+  workflow_call:
 permissions:
   contents: read
 jobs:
-  changelog:
+  verify:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 0
           persist-credentials: false
+      - uses: ruby/setup-ruby@de492cf36cbab201753d720ce4f4e336cd688c94 # v1
+        with:
+          ruby-version: '4.0.9'
+          bundler: '4.0.11'
+          bundler-cache: true
       - uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 # v2
         with:
           tool: git-cliff@2.12.0
-      - run: git-cliff --config cliff.toml --unreleased --output "$RUNNER_TEMP/changelog.md"
+      - run: bundle exec rake verify

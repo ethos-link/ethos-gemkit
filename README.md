@@ -1,72 +1,81 @@
 # Ethos Gemkit
 
-Shared development tooling for Ethos Link Ruby gems. Requires Ruby 4.0+.
-The toolkit does not require Rails and belongs in a gem's development/test
-Gemfile, never its runtime gemspec.
+Shared development defaults for Ethos Link gems: Ruby 4, Standard, optional Rails
+8 linting, hooks, package checks and one tag-driven release workflow. The toolkit
+belongs in the development/test Gemfile, never a consumer's runtime gemspec.
+
+During bootstrap, pin the Git dependency and workflow callers to the same reviewed
+commit; the toolkit has not been published. See the working
+[Cloudflare Tunnel Gemfile](https://github.com/ethos-link/cloudflare-tunnel/blob/feat/ethos-gemkit/Gemfile).
+
+A standard gem needs this Rakefile:
 
 ```ruby
-group :development, :test do
-  gem "ethos-gemkit", "~> 0.1", require: false
-end
+require "ethos/gemkit/rake"
 ```
 
-During bootstrap, use `path: "../ethos-gemkit"` or set `ETHOS_GEMKIT_PATH` in
-consumer repositories. Keep the toolkit checkout adjacent to those repositories.
-There is no published version or hosted reusable-workflow revision yet. Consumer
-branches using the local path are for local review; installable distribution and
-immutable workflow references must be established before merging them.
+Use the native configuration files rather than a setup generator:
 
-Run `bundle install`, then `bundle exec ethos-gemkit setup` to preview the thin
-Rake/configuration changes. Use `setup --write` to apply them. Existing Rake
-tasks, Standard exclusions and comments are preserved. `--checks test,herb:parse`
-selects the existing local checks; engines can register a task that runs their
-complete `bin/ci`. A repeated setup makes no changes. Gemfile dependency edits
-and repository hook commands remain explicit. Use `bundle exec ethos-gemkit guard`
-in pre-commit hooks to enforce feature branches. Consumers with existing narrow
-release metadata guards retain those guards until release extraction.
-
-Available commands:
-
-```sh
-bundle exec rake lint
-bundle exec rake lint:fix
-bundle exec rake package:verify
-bundle exec rake verify
-bundle exec lefthook install
-bundle exec ethos-gemkit doctor
+```yaml
+# .standard.yml
+ruby_version: "4.0"
+plugins:
+  - ethos-gemkit
 ```
 
-`standard`, `standard:fix` and editor integrations use the same `.standard.yml`
-plugin. Plain Ruby and Active Support-only bundles use Standard's Ruby rules.
-Bundles containing Rails 8 framework components also receive upstream
-Standard Rails rules. Rails is detected from Bundler's specifications without
-booting an application. Incompatible framework minor versions fail clearly.
-Optional Rails libraries may document narrow exclusions for rules that assume
-application APIs, such as inheriting a host ApplicationController.
+Keep Standard exclusions locally. The plugin detects Rails 8 components from the
+bundle without booting an application; plain Ruby and Active Support-only bundles
+use Ruby rules. SDK Rake tasks reject configurations that omit the shared plugin.
+Existing hooks call `bundle exec ethos-gemkit guard` before commits and
+`bundle exec ethos-gemkit commitlint --message {1}` for commit messages. Install
+hooks with `bundle exec lefthook install`. Direct main/master commits are blocked.
 
-`verify` runs lint, the repository's configured Rake checks, then a disposable
-package build. Configuration is loaded from `.ethos-gemkit.yml`, rejects unknown
-keys and unsafe YAML, and constrains metadata paths to the repository. Package
-validation checks the Ruby minimum, runtime toolkit leakage, unsafe paths and
-agreement between the registry host and gemspec `allowed_push_host`.
+No `.ethos-gemkit.yml` is needed for standard public gems. Private gems declare
+`registry: github_packages`; custom checks use `checks: [ci:local]`. Optional
+`gem_name`, `repository` and `version_file` override the one-gemspec, Ethos Link
+repository and one-version-file conventions. Unknown keys and unsafe paths fail.
+The lower-level `ethos/gemkit/tasks` entrypoint retains existing custom test and
+release tasks while a repository is adopting the toolkit.
 
-Both public and private gems use these same tasks. The supported registry
-profiles are RubyGems and `https://rubygems.pkg.github.com/ethos-link`.
-Credentials never belong in configuration. This initial toolkit does not
-publish packages, change versions, create tags or replace consumer release
-tasks. Existing release safeguards remain authoritative until the journal,
-registry adapters and reusable release workflows pass their sandbox gates.
+`bundle exec rake verify` runs lint, registered checks, a disposable native gem
+build, and git-cliff validation. `release:prepare[patch]` (also minor, major or a
+newer X.Y.Z) changes the version and changelog on a clean feature branch. Run
+`bundle lock --local`, review the diff, verify and commit normally. It never
+commits, pushes, tags, disables hooks or maintains a journal. Failures leave an
+ordinary working diff for inspection and restoration.
 
-To develop the toolkit:
+After merging the release PR, create an annotated `vVERSION` tag on the reviewed
+main commit and push that tag explicitly with `--no-follow-tags`. The shared
+[release workflow](.github/workflows/release.yml) verifies canonical tag identity,
+main ancestry, version, notes and package bytes, then builds through Bundler.
+GitHub transfers the gem, notes and native SHA-256 checksums to separate publish
+and notes jobs. Neither credentialed job checks out or evaluates consumer code.
+Both registry profiles use the same native `gem push`; RubyGems uses OIDC and
+GitHub Packages uses a scoped `PACKAGES_TOKEN` secret. No public-host fallback
+exists. Live private publication remains unverified until a private pilot runs.
 
-```sh
-bundle install
-bundle exec rake verify
-bundle exec rake build
-ruby script/verify_consumers.rb ../indexmap ../crawlscope ../ethosmark
-```
+Retry **failed jobs** in the original workflow run (within GitHub's 30-day retry
+window). A failed notes job reuses the
+same artifact without publishing again. Artifacts are retained for 90 days.
+An ambiguous upload, existing registry version, existing GitHub release or expired
+artifact or a run older than the retry window requires normal registry/release
+reconciliation. Do not rebuild an
+already published version, replace tags or rerun every job to recover notes.
 
-The consumer smoke script builds and unpacks each artifact outside its source
-checkout, resolves only runtime dependencies, and exercises a core operation
-without Rails/Railties or consumer development dependencies. It intentionally
-excludes engines, whose own packaged-host checks remain required.
+Before enabling the shared RubyGems publisher, configure its trusted publisher:
+consumer owner/repository, workflow filename `release.yml`, workflow repository
+owner `ethos-link`, workflow repository `ethos-gemkit`, environment `rubygems`.
+This updates the consumer-local publisher registration used previously. See the
+[official reusable publisher instructions](https://guides.rubygems.org/trusted-publishing/#using-reusable-workflows).
+
+GitLab is a separate optional [workflow](.github/workflows/sync-gitlab.yml).
+Only add its caller when a target exists, passing an SSH `url`, a project write
+deploy key and independently verified known hosts. Without a URL the job skips;
+Cloudflare Tunnel has no caller. It copies current main using a fast-forward
+push, without tags, force or deletions. Provision target visibility no broader
+than the source. Local bare-repository fixtures cover repeat/stale events and
+divergence; live SSH credentials and host keys still require target validation.
+
+Develop with `bundle install` and `bundle exec rake verify`. Release and registry
+fixtures live in tests, using real Git and native gem builds with fake network
+publishers. No production rehearsal command or registry client is required.

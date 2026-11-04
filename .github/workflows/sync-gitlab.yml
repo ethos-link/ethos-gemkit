@@ -1,0 +1,54 @@
+name: Optional GitLab main sync
+on:
+  workflow_call:
+    inputs:
+      url:
+        description: SSH project URL; blank disables the entire job
+        type: string
+        default: ''
+    secrets:
+      GITLAB_DEPLOY_KEY:
+        required: false
+      GITLAB_KNOWN_HOSTS:
+        required: false
+permissions:
+  contents: read
+concurrency:
+  group: gitlab-main-${{ github.repository }}
+  cancel-in-progress: false
+jobs:
+  sync:
+    if: startsWith(inputs.url, 'git@') && github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Validate the SSH project URL before loading credentials
+        env:
+          GITLAB_URL: ${{ inputs.url }}
+        run: |
+          [[ "$GITLAB_URL" =~ ^git@[a-zA-Z0-9.-]+:[a-zA-Z0-9_-][a-zA-Z0-9_./-]*\.git$ ]]
+          [[ "$GITLAB_URL" != *'/../'* && "$GITLAB_URL" != *'/./'* ]]
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Fast-forward current main using scoped SSH credentials
+        env:
+          GITLAB_URL: ${{ inputs.url }}
+          GITLAB_DEPLOY_KEY: ${{ secrets.GITLAB_DEPLOY_KEY }}
+          GITLAB_KNOWN_HOSTS: ${{ secrets.GITLAB_KNOWN_HOSTS }}
+        run: |
+          test -n "$GITLAB_DEPLOY_KEY"
+          test -n "$GITLAB_KNOWN_HOSTS"
+          key_directory=$(mktemp -d)
+          trap 'rm -rf "$key_directory"' EXIT
+          chmod 700 "$key_directory"
+          printf '%s\n' "$GITLAB_DEPLOY_KEY" > "$key_directory/key"
+          printf '%s\n' "$GITLAB_KNOWN_HOSTS" > "$key_directory/known_hosts"
+          chmod 600 "$key_directory/key" "$key_directory/known_hosts"
+          export GIT_SSH_COMMAND="ssh -i $key_directory/key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$key_directory/known_hosts -o BatchMode=yes"
+          git fetch --no-tags origin refs/heads/main:refs/remotes/origin/main
+          git -c core.hooksPath=/dev/null push --no-follow-tags "$GITLAB_URL" refs/remotes/origin/main:refs/heads/main
+          expected=$(git rev-parse refs/remotes/origin/main)
+          actual=$(git ls-remote --refs "$GITLAB_URL" refs/heads/main | cut -f1)
+          test "$actual" = "$expected"
+          echo "GitLab main synchronized to $expected" >> "$GITHUB_STEP_SUMMARY"

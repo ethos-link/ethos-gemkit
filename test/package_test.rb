@@ -30,6 +30,14 @@ class PackageTest < GemkitTest
     end
   end
 
+  def test_private_registry_uses_the_same_package_checks
+    in_fixture do |directory|
+      fixture(directory, host: "https://rubygems.pkg.github.com/ethos-link")
+      config = Ethos::Gemkit::Configuration.new(directory, configuration.merge("registry" => "github_packages"))
+      assert Ethos::Gemkit::Package.new(config).verify
+    end
+  end
+
   def test_rejects_unsafe_metadata_or_runtime_toolkit_dependency
     in_fixture do |directory|
       [{ruby: ">= 3.2"}, {host: "https://other.example"}, {extra: 's.add_dependency "ethos-gemkit"'}].each do |options|

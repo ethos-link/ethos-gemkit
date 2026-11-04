@@ -1,45 +1,29 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require "ethos/gemkit/configuration"
-require "ethos/gemkit/doctor"
-require "ethos/gemkit/setup"
 require "ethos/gemkit/branch"
+require "ethos/gemkit/commit_message"
 require "optparse"
 
 begin
-  case ARGV.shift
-  when "setup"
-    options = {checks: ["test"], release_mode: "staged"}
-    write = false
-    parser = OptionParser.new do |opts|
-      opts.on("--write", "Apply the previewed changes") { write = true }
-      opts.on("--checks TASKS", "Comma-separated local Rake checks") { |value| options[:checks] = value.split(",") }
-      opts.on("--release-mode MODE", "staged or atomic") { |value| options[:release_mode] = value }
-    end
-    parser.parse!(ARGV)
-    abort "Unexpected arguments: #{ARGV.join(" ")}" unless ARGV.empty?
-    setup = Ethos::Gemkit::Setup.new(**options)
-    if write
-      puts setup.apply.map { |name| "Updated #{name}" }
-    else
-      setup.changes.each do |name, content|
-        puts "=== #{name} (preview) ===", content
-      end
-      puts "Run setup --write to apply. Add ethos-gemkit to your development/test Gemfile first."
-    end
+  command = ARGV.shift
+  case command
+  when "commitlint"
+    input = nil
+    OptionParser.new do |opts|
+      opts.on("--message MESSAGE_OR_FILE") { |value| input = value }
+    end.parse!(ARGV)
+    abort "Usage: ethos-gemkit commitlint --message MESSAGE_OR_FILE" if input.nil? || !ARGV.empty?
+    message = File.file?(input) ? File.read(input) : input
+    Ethos::Gemkit::CommitMessage.validate(message)
+    puts "Commit message valid"
   when "guard"
     abort "Usage: ethos-gemkit guard" unless ARGV.empty?
     Ethos::Gemkit::Branch.check
-  when "doctor"
-    abort "Usage: ethos-gemkit doctor" unless ARGV.empty?
-    config = Ethos::Gemkit::Configuration.load
-    Ethos::Gemkit::Doctor.new(config).check
-    puts "ethos-gemkit #{Ethos::Gemkit::VERSION}: #{config.name} configured"
   when "version", "--version"
     puts Ethos::Gemkit::VERSION
   else
-    abort "Usage: ethos-gemkit setup [--write] | doctor | guard | --version"
+    abort "Usage: ethos-gemkit guard | commitlint --message MESSAGE_OR_FILE | --version"
   end
 rescue Ethos::Gemkit::Error, OptionParser::ParseError => error
   abort error.message
