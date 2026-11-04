@@ -1,0 +1,3 @@
+ruby_version: "4.0"
+plugins:
+  - ethos-gemkit

@@ -1,0 +1,10 @@
+pre-commit:
+  jobs:
+    - name: feature-branch
+      run: bundle exec ethos-gemkit guard
+    - name: standard
+      run: bundle exec standardrb
+commit-msg:
+  jobs:
+    - name: commitlint
+      run: bundle exec commitlint --message {1}

@@ -1,0 +1,16 @@
+schema_version: 1
+workflow_contract: 1
+gem_name: ethos-gemkit
+repository: ethos-link/ethos-gemkit
+default_branch: main
+version_file: lib/ethos/gemkit/version.rb
+metadata_files:
+  - lib/ethos/gemkit/version.rb
+  - CHANGELOG.md
+  - Gemfile.lock
+release_mode: staged
+registry:
+  kind: rubygems
+  host: https://rubygems.org
+checks:
+  - test
