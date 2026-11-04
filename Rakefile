@@ -9,5 +9,7 @@ Rake::TestTask.new do |task|
 end
 
 task default: :verify
-Rake::Task[:release].clear
-Rake::Task[:release].enhance { abort "Publication is not enabled during toolkit bootstrap" }
+Rake::Task.tasks.select { |task| task.name == "release" || task.name.start_with?("release:") }.each do |task|
+  task.clear
+  task.enhance { abort "Publication is not enabled during toolkit bootstrap" }
+end
