@@ -32,5 +32,5 @@ jobs:
           fi
           while read -r commit; do
             git show -s --format=%B "$commit" > "$RUNNER_TEMP/message"
-            bundle exec commitlint --message "$RUNNER_TEMP/message"
+            bundle exec ethos-gemkit commitlint --message "$RUNNER_TEMP/message"
           done < "$RUNNER_TEMP/commits"

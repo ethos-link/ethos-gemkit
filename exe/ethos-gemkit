@@ -5,6 +5,7 @@ require "ethos/gemkit/configuration"
 require "ethos/gemkit/doctor"
 require "ethos/gemkit/setup"
 require "ethos/gemkit/branch"
+require "ethos/gemkit/commit_message"
 require "optparse"
 
 begin
@@ -28,6 +29,15 @@ begin
       end
       puts "Run setup --write to apply. Add ethos-gemkit to your development/test Gemfile first."
     end
+  when "commitlint"
+    input = nil
+    OptionParser.new do |opts|
+      opts.on("--message MESSAGE_OR_FILE") { |value| input = value }
+    end.parse!(ARGV)
+    abort "Usage: ethos-gemkit commitlint --message MESSAGE_OR_FILE" if input.nil? || !ARGV.empty?
+    message = File.file?(input) ? File.read(input) : input
+    Ethos::Gemkit::CommitMessage.validate(message)
+    puts "Commit message valid"
   when "guard"
     abort "Usage: ethos-gemkit guard" unless ARGV.empty?
     Ethos::Gemkit::Branch.check
@@ -39,7 +49,7 @@ begin
   when "version", "--version"
     puts Ethos::Gemkit::VERSION
   else
-    abort "Usage: ethos-gemkit setup [--write] | doctor | guard | --version"
+    abort "Usage: ethos-gemkit setup [--write] | doctor | guard | commitlint --message MESSAGE_OR_FILE | --version"
   end
 rescue Ethos::Gemkit::Error, OptionParser::ParseError => error
   abort error.message

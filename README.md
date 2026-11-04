@@ -50,6 +50,12 @@ keys and unsafe YAML, and constrains metadata paths to the repository. Package
 validation checks the Ruby minimum, runtime toolkit leakage, unsafe paths and
 agreement between the registry host and gemspec `allowed_push_host`.
 
+Commit hooks and commit-message CI use `ethos-gemkit commitlint --message FILE`.
+The shared types are `feat`, `fix`, `chore`, `refactor`, `docs`, `test`, `perf`,
+`ci` and `build`, with a 72-character header limit. The adapter uses upstream
+commitlint's validator without modifying its fixed type constants or rewriting
+commit text. Engineering context in the body still requires human review.
+
 Both public and private gems use these same tasks. The supported registry
 profiles are RubyGems and `https://rubygems.pkg.github.com/ethos-link`.
 Credentials never belong in configuration. This initial toolkit does not
