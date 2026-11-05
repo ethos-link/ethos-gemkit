@@ -55,6 +55,19 @@ class WorkflowTest < GemkitTest
     end
   end
 
+  def test_consumer_setup_is_optional_and_runs_before_read_only_verification
+    consumer = workflow("consumer")
+    input = consumer.fetch(true).fetch("workflow_call").fetch("inputs").fetch("build-setup")
+    assert_equal "", input.fetch("default")
+    assert_equal "read", consumer.fetch("permissions").fetch("contents")
+    steps = consumer.fetch("jobs").fetch("verify").fetch("steps")
+    setup_index = steps.index { |step| step["name"] == "Set up consumer verification dependencies" }
+    setup = steps.fetch(setup_index)
+    assert_equal "inputs.build-setup != ''", setup.fetch("if")
+    assert_equal "${{ inputs.build-setup }}", setup.fetch("run")
+    assert steps.drop(setup_index + 1).any? { |step| step.fetch("run", "").include?("bundle exec rake verify") }
+  end
+
   def test_gitlab_validates_before_credentials_and_is_gated_by_a_url_and_main
     job = workflow("sync-gitlab").fetch("jobs").fetch("sync")
     assert_includes job.fetch("if"), "startsWith(inputs.url, 'git@')"

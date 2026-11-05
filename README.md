@@ -53,6 +53,11 @@ release tasks while a repository is adopting the toolkit.
 `bundle exec rake verify` runs lint, registered checks, a disposable native gem
 build, and git-cliff validation.
 
+Ordinary pull requests call `.github/workflows/consumer.yml`. Its optional
+`build-setup` input provisions system dependencies before verification, such as
+browser packages or a disposable database. Keep the caller's permissions at
+`contents: read`; this workflow does not need publishing credentials.
+
 ## Private gem access
 
 To install private gems locally, use a GitHub personal access token (classic)
