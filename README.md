@@ -53,6 +53,46 @@ release tasks while a repository is adopting the toolkit.
 `bundle exec rake verify` runs lint, registered checks, a disposable native gem
 build, and git-cliff validation.
 
+The gem ships `mise.toml` and `mise.lock` to pin development tools for local use
+and CI. No Node.js or npm installation is needed for Gemkit.
+
+| Tools | Installation and version ownership |
+| --- | --- |
+| git-cliff 2.12.0, GitHub CLI 2.103.2 | Native binaries installed by mise from the shipped lockfile |
+| Ruby 4.0.9 | Local mise pin; matching `ruby/setup-ruby` pin in CI |
+| Bundler 4.0.11 | Explicit CI pin; install the same version locally |
+| Standard, Standard Rails, Rake, Lefthook | Bundler and the consumer's `Gemfile.lock` |
+| Git, SSH, sha256sum, shell utilities | System prerequisites; hosted CI uses the Ubuntu runner image |
+| Consumer-specific binaries | Consumer local setup |
+
+Install mise (CI uses 2026.10.19), Ruby and Bundler, then run:
+
+```sh
+bundle install
+bundle exec rake tools:install
+bundle exec rake verify
+```
+
+The install task trusts the gem's mise configuration and installs its pinned
+native git-cliff and GitHub CLI binaries. Verification and release preparation
+resolve those binaries through mise using the installed gem's configuration,
+even when called from a consumer directory. They do not fall back to global
+installations or download tools on demand. Re-run installation after upgrading
+Gemkit. Consumer repositories need no npm manifest or copied tool pins.
+
+For work on Gemkit itself, install the Ruby and CLI pins with
+`mise install --locked ruby git-cliff gh`; activate mise in your shell or run
+`mise exec ruby git-cliff gh -- bundle exec rake verify`. The lockfile covers
+Linux and macOS on x64 and arm64. Ruby version parity with CI is checked by
+the tests.
+Git and OS utilities still come from the host; identical tool versions do not
+provide an identical operating system.
+
+The release build workflow loads the installed gem's configuration through a
+SHA-pinned mise action. The isolated release-notes job has its own
+exact GitHub CLI pin, checked against `mise.toml` by the tests, so it can publish
+notes without loading consumer code.
+
 Run verification locally before pushing and when preparing a release. GitHub
 Actions checks commit messages on ordinary PRs and main pushes; it does not run
 tests, lint, browser checks or integration suites. Release workflows validate
@@ -91,7 +131,8 @@ Ordinary feature/fix PRs run commitlint; only a release PR starts publication.
 - Ignore `/.bundle/`, `/vendor/bundle/` and `/pkg/` in `.gitignore`. The shared
   workflows use Ruby setup's native `vendor/bundle` cache; generated files must
   leave the release checkout clean.
-- Install the bundle, Git, git-cliff and GitHub CLI. Configure your Git identity,
+- Install the bundle, Git and mise. Run
+  `bundle exec rake tools:install`. Configure your Git identity,
   authenticate with `gh auth login`, and install hooks with
   `bundle exec lefthook install`. You need permission to push branches and open PRs.
 - Public gems: configure a matching RubyGems trusted publisher for **each gem**

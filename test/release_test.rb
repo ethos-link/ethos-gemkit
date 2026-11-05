@@ -53,6 +53,17 @@ class ReleaseTest < GemkitTest
       printf '%s\\n' 'https://github.com/ethos-link/fixture/pull/1'
     SH
     File.chmod(0o755, File.join(@bin, "gh"))
+    # Mock only gh's mise lookup; changelogs still use the real pinned binary.
+    mise = `command -v mise`.strip
+    File.write(File.join(@bin, "mise"), <<~SH)
+      #!/bin/sh
+      if [ "$3" = which ] && [ "$5" = gh ]; then
+        printf '%s/gh\\n' "#{@bin}"
+      else
+        exec "#{mise}" "$@"
+      fi
+    SH
+    File.chmod(0o755, File.join(@bin, "mise"))
     {"pre-commit" => "guard", "commit-msg" => 'commitlint --message "$1"'}.each do |hook, action|
       path = File.join(@root, ".git/hooks", hook)
       File.write(path, "#!/bin/sh\nexec #{RbConfig.ruby} -I#{TOOLKIT}/lib #{TOOLKIT}/exe/ethos-gemkit #{action}\n")
