@@ -10,7 +10,7 @@ task "release:prepare", [:target] do |_task, args|
 end
 
 desc "Verify release source and build using Bundler's native task"
-task "release:build" => :verify do
+task "release:build" do
   release = Ethos::Gemkit::Release.new(config)
   notes = release.verify(ENV.fetch("RELEASE_TAG"), tagged: ENV["RELEASE_FROM_PR"] != "true")
   Rake::Task[:build].invoke

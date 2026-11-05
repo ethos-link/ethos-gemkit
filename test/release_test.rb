@@ -27,7 +27,7 @@ class ReleaseTest < GemkitTest
       end
     SPEC
     File.write(File.join(@root, "Gemfile"), "source \"https://rubygems.org\"\ngemspec\ngem \"ethos-gemkit\", path: #{TOOLKIT.inspect}, require: false\n")
-    File.write(File.join(@root, "Rakefile"), "require \"rake\"\ntask :test\nrequire \"ethos/gemkit/rake\"\n")
+    File.write(File.join(@root, "Rakefile"), "require \"rake\"\ntask(:test) { abort \"Checks belong in local preparation\" if ENV[\"FIXTURE_FORBID_CHECKS\"] }\nrequire \"ethos/gemkit/rake\"\n")
     File.write(File.join(@root, ".standard.yml"), "ruby_version: \"4.0\"\nplugins:\n  - ethos-gemkit\n")
     FileUtils.cp(File.join(TOOLKIT, ".gitignore"), File.join(@root, ".gitignore"))
     File.write(File.join(@root, "CHANGELOG.md"), "## [0.1.0]\n\n- Existing package.\n")
@@ -110,7 +110,7 @@ class ReleaseTest < GemkitTest
     git("push", "--no-follow-tags", "origin", "main")
     FileUtils.mkdir_p(File.join(@root, "vendor/bundle"))
     File.write(File.join(@root, "vendor/bundle/cached-gem"), "CI dependency cache\n")
-    command("bundle", "exec", "rake", "release:build", environment: {"RELEASE_TAG" => "v0.1.1", "RELEASE_FROM_PR" => "true"})
+    command("bundle", "exec", "rake", "release:build", environment: {"RELEASE_TAG" => "v0.1.1", "RELEASE_FROM_PR" => "true", "FIXTURE_FORBID_CHECKS" => "1"})
     workflow = YAML.safe_load_file(File.join(TOOLKIT, ".github/workflows/release.yml"))
     tag = workflow.fetch("jobs").fetch("tag").fetch("steps").last.fetch("run")
     environment = {"RELEASE_TAG" => "v0.1.1", "RELEASE_COMMIT" => git("rev-parse", "HEAD")}

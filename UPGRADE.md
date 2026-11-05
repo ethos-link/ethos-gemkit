@@ -1,5 +1,16 @@
 # Upgrading Gemkit
 
+## Next
+
+Run `bundle exec rake verify` locally before pushing. `release:prepare` still
+runs the complete local verification gate. `release:build` validates release
+source and packages it without repeating tests or lint in GitHub Actions.
+
+Delete verification workflow callers (`ruby.yml` or `verify.yml`) and retain
+commitlint and release callers. Pin the installed Gemkit and remaining callers
+to the same release. Remove the release caller's `build-setup` input; databases,
+browsers and other test dependencies are now provisioned only locally.
+
 ## 0.2.1
 
 Release preparation now fetches registry checksums with Bundler instead of
