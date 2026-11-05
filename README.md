@@ -53,10 +53,11 @@ release tasks while a repository is adopting the toolkit.
 `bundle exec rake verify` runs lint, registered checks, a disposable native gem
 build, and git-cliff validation.
 
-Ordinary pull requests call `.github/workflows/consumer.yml`. Its optional
-`build-setup` input provisions system dependencies before verification, such as
-browser packages or a disposable database. Keep the caller's permissions at
-`contents: read`; this workflow does not need publishing credentials.
+Run verification locally before pushing and when preparing a release. GitHub
+Actions checks commit messages on ordinary PRs and main pushes; it does not run
+tests, lint, browser checks or integration suites. Release workflows validate
+release source and package integrity, then tag and publish without repeating
+the locally completed checks.
 
 ## Private gem access
 
@@ -78,7 +79,7 @@ token. See [GitHub's registry guide](https://docs.github.com/en/packages/working
 **Run `release:prepare` from clean, up-to-date `main`.** It creates the conventional
 release branch and opens a PR. **Merging that release PR starts publication.**
 This is the same process for Gemkit itself and its adopted consumer gems.
-Ordinary feature/fix PRs run verification; only a release PR starts publication.
+Ordinary feature/fix PRs run commitlint; only a release PR starts publication.
 
 ### One-time prerequisites
 
@@ -111,11 +112,10 @@ against `main` and `push: tags: ["v*"]`, and pin the commit matching the install
 Gemkit release.
 See the [Tunnel caller](https://github.com/ethos-link/cloudflare-tunnel/blob/main/.github/workflows/release.yml).
 
-Projects keep their own checks. Engines can register `checks: [ci:local]` in
-`.ethos-gemkit.yml` and have that task run `bin/ci`. Set the release caller's
-optional `build-setup` input to provision those checks' dependencies, such as
-PostgreSQL or browser packages. Setup runs only in the read-only build job;
-publishing credentials remain in the separate publish job.
+Projects keep their own local checks. Engines can register `checks: [ci:local]`
+in `.ethos-gemkit.yml` and have that task run `bin/ci`. Provision PostgreSQL or
+browser dependencies locally before running verification. Release callers do
+not install test dependencies or accept `build-setup`.
 
 ### RubyGems trusted-publisher settings
 
@@ -177,7 +177,8 @@ When starting from main, a leftover local release branch is recreated only if
 all its commits are already in main; unmerged work is preserved and stops the task.
 
 Review the generated notes, lockfile and version in the PR. Add or adjust upgrade
-notes in a follow-up commit when needed, and wait for CI before merging. The task
+notes in a follow-up commit when needed, rerun affected checks locally, and wait
+for commitlint before merging. The task
 prints the PR URL and makes clear that merging it publishes the release.
 
 ### Merge and publish
@@ -185,8 +186,9 @@ prints the PR URL and makes clear that merging it publishes the release.
 Merging a same-repository `chore/release-vX.Y.Z` PR into main runs the shared
 workflow against its exact merge commit, including squash and rebase merges:
 
-1. Verify the expected version, main ancestry, notes, committed package bytes and
-   all registered checks; build one release artifact through Bundler.
+1. Verify the expected version, main ancestry, notes and committed package bytes;
+   build one release artifact through Bundler. Tests and lint already ran locally
+   during `release:prepare` and are not repeated in Actions.
 2. Create and push the annotated `vX.Y.Z` tag without overwriting existing tags
    or following unrelated local tags.
 3. In an isolated job, verify the artifact's SHA-256 checksums, obtain the proper

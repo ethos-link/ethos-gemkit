@@ -20,9 +20,6 @@ class WorkflowTest < GemkitTest
     assert_equal "write", jobs.fetch("publish").fetch("permissions").fetch("packages")
     assert_equal "${{ secrets.PACKAGES_TOKEN || github.token }}", jobs.fetch("publish").fetch("steps").last.fetch("env").fetch("PACKAGES_TOKEN")
     assert_equal "write", jobs.fetch("notes").fetch("permissions").fetch("contents")
-    setup = jobs.fetch("build").fetch("steps").find { |step| step["name"] == "Set up consumer verification dependencies" }
-    assert_equal "${{ inputs.build-setup }}", setup.fetch("run")
-    assert_equal "inputs.build-setup != ''", setup.fetch("if")
     assert_includes jobs.fetch("build").fetch("if"), "github.event_name == 'push'"
     assert_includes jobs.fetch("build").fetch("steps").first.fetch("with").fetch("ref"), "pull_request.merge_commit_sha"
     assert_includes jobs.fetch("build").fetch("if"), "pull_request.merged == true"
@@ -55,17 +52,13 @@ class WorkflowTest < GemkitTest
     end
   end
 
-  def test_consumer_setup_is_optional_and_runs_before_read_only_verification
-    consumer = workflow("consumer")
-    input = consumer.fetch(true).fetch("workflow_call").fetch("inputs").fetch("build-setup")
-    assert_equal "", input.fetch("default")
-    assert_equal "read", consumer.fetch("permissions").fetch("contents")
-    steps = consumer.fetch("jobs").fetch("verify").fetch("steps")
-    setup_index = steps.index { |step| step["name"] == "Set up consumer verification dependencies" }
-    setup = steps.fetch(setup_index)
-    assert_equal "inputs.build-setup != ''", setup.fetch("if")
-    assert_equal "${{ inputs.build-setup }}", setup.fetch("run")
-    assert steps.drop(setup_index + 1).any? { |step| step.fetch("run", "").include?("bundle exec rake verify") }
+  def test_hosted_workflows_keep_checks_local
+    refute File.exist?(File.expand_path("../.github/workflows/verify.yml", __dir__))
+    refute File.exist?(File.expand_path("../.github/workflows/consumer.yml", __dir__))
+    build = workflow("release").fetch("jobs").fetch("build").fetch("steps")
+    refute build.any? { |step| step.fetch("uses", "").include?("taiki-e/install-action") }
+    refute build.any? { |step| step.fetch("run", "").include?("rake verify") }
+    assert_equal "Validate release source and build package", build.find { |step| step["id"] == "build" }.fetch("name")
   end
 
   def test_gitlab_validates_before_credentials_and_is_gated_by_a_url_and_main
