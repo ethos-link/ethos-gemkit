@@ -218,7 +218,14 @@ workflow run. This reuses its verified artifact and existing tag; do not run
 gh run rerun RUN_ID --repo OWNER/REPOSITORY --failed
 ```
 
-For CI failures, retry **failed jobs in the original run** within GitHub's 30-day
+If a failed build needs a source fix and no tag or upload exists, keep the
+prepared version and notes. Update its `chore/release-vX.Y.Z` branch from main,
+commit the fix, run verification and open a replacement release PR. Merge that
+PR to run the corrected source. The original run stays pinned to its original
+commit; rerunning it cannot pick up a source fix. Do not replace an existing tag
+or reuse a version that was already published.
+
+For transient CI failures, retry **failed jobs in the original run** within GitHub's 30-day
 retry window. Artifacts are retained for 90 days. A failed tag step can reuse an
 existing annotated tag only when it points to the same verified commit. A failed
 notes job reuses the original artifact without uploading again. Ambiguous uploads,
