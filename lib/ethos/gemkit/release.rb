@@ -4,6 +4,7 @@ require "open3"
 require "bundler"
 require_relative "configuration"
 require_relative "branch"
+require_relative "tools"
 
 module Ethos
   module Gemkit
@@ -18,6 +19,8 @@ module Ethos
 
       # Release metadata uses an ordinary branch and PR; main is never committed.
       def prepare(target = "patch")
+        git_cliff = Tools.executable("git-cliff")
+        github = Tools.executable("gh")
         progress "Checking working tree and repository"
         clean
         canonical_origin
@@ -53,7 +56,7 @@ module Ethos
           raise Error, "Start from main or #{branch} at origin/main"
         end
         progress "Checking GitHub authentication"
-        run("gh", "auth", "status", "--hostname", "github.com")
+        run(github, "auth", "status", "--hostname", "github.com")
         progress "Preparing #{branch}"
         if current_branch == "main"
           unless git("branch", "--list", branch).empty?
@@ -67,7 +70,7 @@ module Ethos
         Branch.check(@config.root)
         progress "Updating version and changelog to #{target}"
         File.write(file, text.sub(literal, %(VERSION = "#{target}")))
-        run("git-cliff", "--config", "cliff.toml", "--unreleased", "--tag", "v#{target}", "--prepend", "CHANGELOG.md", live: true)
+        run(git_cliff, "--config", "cliff.toml", "--unreleased", "--tag", "v#{target}", "--prepend", "CHANGELOG.md", live: true)
         progress "Updating Gemfile.lock"
         run("bundle", "lock", "--add-checksums", live: true)
         progress "Running verification (lint, tests, package, changelog)"
@@ -85,7 +88,7 @@ module Ethos
         progress "Pushing #{branch}"
         run("git", "push", "--no-follow-tags", "--set-upstream", "origin", branch, live: true)
         progress "Opening release PR"
-        url = run("gh", "pr", "create", "--repo", @config.data.fetch("repository"),
+        url = run(github, "pr", "create", "--repo", @config.data.fetch("repository"),
           "--base", "main", "--head", branch, "--title", title,
           "--body", "#{body}\n\nMerging this PR creates annotated tag v#{target} and publishes the verified gem.").strip
         "#{url}\nMerge this release PR to tag and publish v#{target}."

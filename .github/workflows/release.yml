@@ -46,6 +46,15 @@ jobs:
           ruby-version: '4.0.9'
           bundler: '4.0.11'
           bundler-cache: true
+      - id: gemkit-tools
+        name: Locate the installed toolkit's tool configuration
+        run: echo "directory=$(bundle show ethos-gemkit)" >> "$GITHUB_OUTPUT"
+      - uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5
+        with:
+          version: '2026.10.19'
+          working_directory: ${{ steps.gemkit-tools.outputs.directory }}
+          install_args: --locked gh
+          add_shims_to_path: false
       - name: Validate release source and build package
         id: build
         env:
@@ -132,6 +141,14 @@ jobs:
     permissions:
       contents: write
     steps:
+      # This job must not load consumer code. Keep the gh pin aligned with mise.toml.
+      - uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5
+        with:
+          version: '2026.10.19'
+          mise_toml: |
+            [tools]
+            gh = "2.103.2"
+          add_shims_to_path: false
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: gem-${{ needs.build.outputs.commit }}

@@ -8,8 +8,15 @@ require "open3"
 require "json"
 require "bundler"
 require "ethos/gemkit/configuration"
+require "ethos/gemkit/tools"
 
 class GemkitTest < Minitest::Test
+  def tool_version(name)
+    output, error, status = Open3.capture3("mise", "config", "get", "--file", File.join(Ethos::Gemkit::Tools::ROOT, "mise.toml"), "tools.#{name}")
+    assert status.success?, error
+    output.strip
+  end
+
   def configuration(name = "fixture")
     {
       "gem_name" => name, "repository" => "ethos-link/#{name}",

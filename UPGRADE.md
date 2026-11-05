@@ -1,5 +1,47 @@
 # Upgrading Gemkit
 
+## Next release
+
+Install mise (CI uses 2026.10.19) and run `bundle exec rake tools:install` after
+upgrading the gem and matching workflow pins. Gemkit now uses native git-cliff
+and GitHub CLI binaries pinned in its shipped `mise.toml` and `mise.lock`.
+Node.js/npm is not required. Existing global CLI installations are no longer
+used by verification or release preparation. git-cliff stays at 2.12.0 for this
+installation change; GitHub CLI is pinned to 2.103.2.
+
+## Maintaining tool versions
+
+Dependabot checks Ruby dependencies and GitHub Actions weekly. Review the mise
+CLI, tool pins and system dependencies monthly, or sooner for security fixes;
+Dependabot does not update mise tool versions. Do not auto-merge tool upgrades.
+
+To update a tool, edit its exact version in `mise.toml`, then regenerate the
+lockfile for every supported platform and install it:
+
+```sh
+mise lock --platform linux-x64,linux-arm64,macos-x64,macos-arm64
+bundle exec rake tools:install
+bundle exec rake verify
+```
+
+Commit `mise.toml` and `mise.lock` together. For Ruby updates, also update
+`.ruby-version` and every `ruby/setup-ruby` pin; preserve native Bundler caching
+in CI. For GitHub CLI updates, also update the release-notes job's isolated mise
+configuration. Tests reject version drift in these duplicated pins. For mise
+updates, keep the action's `version` input aligned across jobs and verify with
+that version locally. Review Bundler's explicit version separately and keep
+local installation aligned with the workflow pins.
+
+Verification exercises changelog parsing, release preparation against disposable
+Git repositories, and registry fixtures. Review changed changelog output before
+accepting an upgrade, and wait for commitlint before merging. Tests and lint remain local. Never
+use a real consumer release, tag or registry publication as a test. Update
+consumer gem and workflow pins together after the toolkit release.
+
+Git and shell utilities follow the host or CI runner image. Review image
+upgrades separately; exact OS parity would require a shared container. Keep
+Bundler-owned tools in Bundler rather than adding them to mise.
+
 ## 0.3.1
 
 Run `bundle exec rake verify` locally before pushing. `release:prepare` still

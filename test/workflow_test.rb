@@ -80,6 +80,41 @@ class WorkflowTest < GemkitTest
     end
   end
 
+  def test_release_build_installs_the_gems_pinned_github_cli
+    steps = workflow("release").fetch("jobs").fetch("build").fetch("steps")
+    locate = steps.index { |step| step["id"] == "gemkit-tools" }
+    assert_includes steps.fetch(locate).fetch("run"), "bundle show ethos-gemkit"
+    install = steps.index { |step| step.fetch("uses", "").start_with?("jdx/mise-action@") }
+    assert locate < install
+    settings = steps.fetch(install).fetch("with")
+    assert_equal "${{ steps.gemkit-tools.outputs.directory }}", settings.fetch("working_directory")
+    assert_equal "--locked gh", settings.fetch("install_args")
+    assert_equal false, settings.fetch("add_shims_to_path")
+    assert install < steps.index { |step| step["id"] == "build" }
+    refute steps.any? { |step| step.fetch("uses", "").start_with?("actions/setup-node") }
+  end
+
+  def test_ci_runtime_and_isolated_notes_pins_match_the_shared_manifest
+    ruby = tool_version("ruby")
+    assert_equal ruby, File.read(File.join(Ethos::Gemkit::Tools::ROOT, ".ruby-version")).strip
+    mise_versions = []
+    %w[release commitlint-consumer].each do |name|
+      workflow(name).fetch("jobs").each_value do |job|
+        job.fetch("steps").each do |step|
+          if step.fetch("uses", "").start_with?("ruby/setup-ruby@")
+            assert_equal ruby, step.fetch("with").fetch("ruby-version")
+          elsif step.fetch("uses", "").start_with?("jdx/mise-action@")
+            mise_versions << step.fetch("with").fetch("version")
+          end
+        end
+      end
+    end
+    assert_equal 1, mise_versions.uniq.size
+    notes = workflow("release").fetch("jobs").fetch("notes").fetch("steps").find { |step| step.fetch("uses", "").start_with?("jdx/mise-action@") }
+    assert_equal "[tools]\ngh = \"#{tool_version("gh")}\"\n", notes.fetch("with").fetch("mise_toml")
+    refute notes.fetch("with").key?("working_directory")
+  end
+
   def test_gitlab_validates_before_credentials_and_is_gated_by_a_url_and_main
     job = workflow("sync-gitlab").fetch("jobs").fetch("sync")
     assert_includes job.fetch("if"), "startsWith(inputs.url, 'git@')"
