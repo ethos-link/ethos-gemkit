@@ -7,14 +7,14 @@ belongs in the development/test Gemfile, never a consumer's runtime gemspec.
 Install the published gem in the development/test Gemfile:
 
 ```ruby
-gem "ethos-gemkit", "0.2.0", group: [:development, :test], require: false
+gem "ethos-gemkit", "0.2.1", group: [:development, :test], require: false
 ```
 
 Pin workflow callers to the full commit behind the installed Gemkit release tag.
 Resolve that commit with:
 
 ```sh
-git ls-remote https://github.com/ethos-link/ethos-gemkit.git 'refs/tags/v0.2.0^{}'
+git ls-remote https://github.com/ethos-link/ethos-gemkit.git 'refs/tags/v0.2.1^{}'
 ```
 
 Upgrade the gem version and workflow pins together. Consumer READMEs should cover

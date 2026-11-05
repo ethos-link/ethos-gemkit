@@ -1,6 +1,6 @@
 # Upgrading Gemkit
 
-## Unreleased
+## 0.2.1
 
 Release preparation now fetches registry checksums with Bundler instead of
 using local-only resolution. Network access to configured gem sources is
