@@ -1,6 +1,11 @@
 name: Commit messages
 on:
   workflow_call:
+    inputs:
+      toolkit-ref:
+        description: Immutable Gemkit commit matching the workflow caller
+        type: string
+        required: true
 permissions:
   contents: read
 jobs:
@@ -11,11 +16,16 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Check out the pinned commit validator
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          repository: ethos-link/ethos-gemkit
+          ref: ${{ inputs.toolkit-ref }}
+          path: .gemkit-tooling
+          persist-credentials: false
       - uses: ruby/setup-ruby@de492cf36cbab201753d720ce4f4e336cd688c94 # v1
         with:
           ruby-version: '4.0.9'
-          bundler: '4.0.11'
-          bundler-cache: true
       - name: Validate commit messages
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
@@ -30,5 +40,5 @@ jobs:
           fi
           while read -r commit; do
             git show -s --format=%B "$commit" > "$RUNNER_TEMP/message"
-            bundle exec ethos-gemkit commitlint --message "$RUNNER_TEMP/message"
+            ruby -I "$GITHUB_WORKSPACE/.gemkit-tooling/lib" "$GITHUB_WORKSPACE/.gemkit-tooling/exe/ethos-gemkit" commitlint --message "$RUNNER_TEMP/message"
           done < "$RUNNER_TEMP/commits"
