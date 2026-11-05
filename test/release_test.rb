@@ -94,6 +94,7 @@ class ReleaseTest < GemkitTest
     assert_includes output, "https://github.com/ethos-link/fixture/pull/1"
     assert_includes output, "Merge this release PR"
     assert_equal "chore/release-v0.1.1", git("branch", "--show-current")
+    assert_match(/^  standard \([^)]+\) sha256=[a-f0-9]{64}$/, File.read(File.join(@root, "Gemfile.lock")))
     assert_equal "chore(release): prepare v0.1.1", git("log", "-1", "--format=%s")
     assert_equal before, git("rev-parse", "main")
     assert_equal before, git("--git-dir", @origin, "rev-parse", "main")

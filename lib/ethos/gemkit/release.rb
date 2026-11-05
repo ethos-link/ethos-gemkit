@@ -69,7 +69,7 @@ module Ethos
         File.write(file, text.sub(literal, %(VERSION = "#{target}")))
         run("git-cliff", "--config", "cliff.toml", "--unreleased", "--tag", "v#{target}", "--prepend", "CHANGELOG.md", live: true)
         progress "Updating Gemfile.lock"
-        run("bundle", "lock", "--local", live: true)
+        run("bundle", "lock", "--add-checksums", live: true)
         progress "Running verification (lint, tests, package, changelog)"
         run("bundle", "exec", "rake", "verify", live: true)
         files = [@config.data.fetch("version_file"), "CHANGELOG.md", "Gemfile.lock"]

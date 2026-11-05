@@ -1,5 +1,12 @@
 # Upgrading Gemkit
 
+## Unreleased
+
+Release preparation now fetches registry checksums with Bundler instead of
+using local-only resolution. Network access to configured gem sources is
+required. Existing compatible dependency versions stay locked; complete
+checksums prevent frozen CI installs from rejecting local cache metadata.
+
 ## 0.2.0
 
 Update the gem version and pin each workflow caller to the commit behind the

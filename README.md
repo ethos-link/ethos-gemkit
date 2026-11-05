@@ -164,8 +164,8 @@ setup.
 The task prints each step and streams command output as it runs. It checks the
 working tree, canonical origin, current main, installed hooks and target tag.
 It creates `chore/release-vX.Y.Z`, updates the version and
-changelog, runs `bundle lock --local` and the full `rake verify`, then commits the
-three metadata files with hooks enabled, pushes the branch, and opens a
+changelog, runs `bundle lock --add-checksums` and the full `rake verify`, then
+commits the three metadata files with hooks enabled, pushes the branch, and opens a
 `chore(release): prepare vX.Y.Z` PR. Main stays unchanged. You can also start on
 that exact pre-created release branch if its HEAD still equals `origin/main`.
 When starting from main, a leftover local release branch is recreated only if
