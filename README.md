@@ -53,6 +53,21 @@ release tasks while a repository is adopting the toolkit.
 `bundle exec rake verify` runs lint, registered checks, a disposable native gem
 build, and git-cliff validation.
 
+## Private gem access
+
+To install private gems locally, use a GitHub personal access token (classic)
+with `read:packages` and access to the package. Configure Bundler once, replacing
+`USERNAME` and `TOKEN` with your credentials:
+
+```sh
+bundle config set --global https://rubygems.pkg.github.com/ethos-link USERNAME:TOKEN
+```
+
+Keep credentials out of Gemfiles. Each gem documents its scoped source block.
+Actions publishing uses `GITHUB_TOKEN`; installing another private repository's
+package requires that repository to grant the workflow access or an explicit
+token. See [GitHub's registry guide](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-rubygems-registry).
+
 ## Releasing a gem
 
 **Run `release:prepare` from clean, up-to-date `main`.** It creates the conventional
