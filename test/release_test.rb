@@ -99,7 +99,11 @@ class ReleaseTest < GemkitTest
     assert_equal before, git("rev-parse", "main")
     assert_equal before, git("--git-dir", @origin, "rev-parse", "main")
     assert_empty git("tag", "--list", "v0.1.1")
-    assert_includes File.read(File.join(@root, "CHANGELOG.md")), "- Existing package."
+    changelog = File.read(File.join(@root, "CHANGELOG.md"))
+    assert_includes changelog, "- Existing package."
+    assert_includes changelog, "### Added\n\n- add fixture behavior\n\n## [0.1.0]"
+    assert_equal 1, changelog.scan(/^# Changelog$/).size
+    refute_match(/\n{3,}/, changelog)
     assert_includes File.read(File.join(@directory, "pull-request")), "--base main --head chore/release-v0.1.1"
     git("switch", "main")
     git("merge", "--ff-only", "chore/release-v0.1.1")
