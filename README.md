@@ -57,7 +57,9 @@ Run verification locally before pushing and when preparing a release. GitHub
 Actions checks commit messages on ordinary PRs and main pushes; it does not run
 tests, lint, browser checks or integration suites. Release workflows validate
 release source and package integrity, then tag and publish without repeating
-the locally completed checks.
+the locally completed checks. Commitlint checks out Gemkit at the caller's
+`toolkit-ref` and runs its Ruby CLI without installing the consumer bundle. Set
+that input to the same immutable commit as the workflow pin.
 
 ## Private gem access
 

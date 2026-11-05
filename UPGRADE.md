@@ -1,6 +1,6 @@
 # Upgrading Gemkit
 
-## Next
+## 0.3.1
 
 Run `bundle exec rake verify` locally before pushing. `release:prepare` still
 runs the complete local verification gate. `release:build` validates release
@@ -8,7 +8,8 @@ source and packages it without repeating tests or lint in GitHub Actions.
 
 Delete verification workflow callers (`ruby.yml` or `verify.yml`) and retain
 commitlint and release callers. Pin the installed Gemkit and remaining callers
-to the same release. Remove the release caller's `build-setup` input; databases,
+to the same release. Pass that immutable commit as `toolkit-ref` to the commitlint
+caller; commitlint runs the pinned Ruby CLI without a bundle install. Remove the release caller's `build-setup` input; databases,
 browsers and other test dependencies are now provisioned only locally.
 
 ## 0.2.1

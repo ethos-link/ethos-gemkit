@@ -8,3 +8,5 @@ permissions:
 jobs:
   messages:
     uses: ./.github/workflows/commitlint-consumer.yml
+    with:
+      toolkit-ref: ${{ github.sha }}

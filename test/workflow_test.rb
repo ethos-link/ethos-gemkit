@@ -61,6 +61,25 @@ class WorkflowTest < GemkitTest
     assert_equal "Validate release source and build package", build.find { |step| step["id"] == "build" }.fetch("name")
   end
 
+  def test_commitlint_uses_pinned_source_without_installing_the_consumer_bundle
+    steps = workflow("commitlint-consumer").fetch("jobs").fetch("commitlint").fetch("steps")
+    toolkit = steps.find { |step| step.fetch("with", {})["repository"] == "ethos-link/ethos-gemkit" }
+    assert_equal "${{ inputs.toolkit-ref }}", toolkit.fetch("with").fetch("ref")
+    refute steps.any? { |step| step.fetch("with", {}).key?("bundler-cache") }
+    script = steps.last.fetch("run")
+    refute_includes script, "bundle"
+    assert_includes script, ".gemkit-tooling/exe/ethos-gemkit"
+    in_fixture do |directory|
+      FileUtils.mkdir_p(File.join(directory, "toolkit"))
+      %w[lib exe].each { |name| FileUtils.cp_r(File.expand_path("../#{name}", __dir__), File.join(directory, "toolkit", name)) }
+      cli = File.join(directory, "toolkit/exe/ethos-gemkit")
+      lib = File.join(directory, "toolkit/lib")
+      env = {"BUNDLE_GEMFILE" => File.join(directory, "missing-Gemfile"), "RUBYOPT" => nil}
+      assert capture(directory, RbConfig.ruby, "-I", lib, cli, "commitlint", "--message", "ci(checks): keep checks local", environment: env).last.success?
+      refute capture(directory, RbConfig.ruby, "-I", lib, cli, "commitlint", "--message", "invalid message", environment: env).last.success?
+    end
+  end
+
   def test_gitlab_validates_before_credentials_and_is_gated_by_a_url_and_main
     job = workflow("sync-gitlab").fetch("jobs").fetch("sync")
     assert_includes job.fetch("if"), "startsWith(inputs.url, 'git@')"
