@@ -77,6 +77,9 @@ Ordinary feature/fix PRs run verification; only a release PR starts publication.
 
 ### One-time prerequisites
 
+- Commit `Gemfile.lock`. Before its first commit, run
+  `bundle lock --add-checksums`; frozen CI installs reject empty registry
+  checksum entries, even when the gems are already installed locally.
 - Ignore `/.bundle/`, `/vendor/bundle/` and `/pkg/` in `.gitignore`. The shared
   workflows use Ruby setup's native `vendor/bundle` cache; generated files must
   leave the release checkout clean.
