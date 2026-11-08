@@ -22,7 +22,7 @@ Gem::Specification.new do |spec|
     "rubygems_mfa_required" => "true",
     "default_lint_roller_plugin" => "Ethos::Gemkit::Plugin"
   }
-  spec.files = Dir.chdir(__dir__) { Dir["lib/**/*.rb", "exe/*", "mise.toml", "mise.lock", "README.md", "UPGRADE.md", "LICENSE.txt", "CHANGELOG.md"].select { |file| File.file?(file) } }
+  spec.files = Dir.chdir(__dir__) { Dir["lib/**/*.rb", "docs/**/*.md", "exe/*", "mise.toml", "mise.lock", "README.md", "UPGRADE.md", "LICENSE.txt", "CHANGELOG.md"].select { |file| File.file?(file) } }
   spec.bindir = "exe"
   spec.executables = ["ethos-gemkit"]
   spec.require_paths = ["lib"]
