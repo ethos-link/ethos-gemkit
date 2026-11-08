@@ -9,17 +9,20 @@ Gem::Specification.new do |spec|
   spec.email = ["devel@ethos-link.com"]
   spec.summary = "Shared development and verification tooling for Ethos Link gems"
   spec.description = "Common Ruby gem tasks, conditional Rails linting, package validation and release verification."
-  spec.homepage = "https://github.com/ethos-link/ethos-gemkit"
+  spec.homepage = "https://www.ethos-link.com/opensource/ethos-gemkit"
   spec.license = "MIT"
   spec.required_ruby_version = ">= 4.0"
   spec.metadata = {
+    "homepage_uri" => spec.homepage,
+    "documentation_uri" => spec.homepage,
+    "bug_tracker_uri" => "https://github.com/ethos-link/ethos-gemkit/issues",
     "allowed_push_host" => "https://rubygems.org",
-    "source_code_uri" => spec.homepage,
-    "changelog_uri" => "#{spec.homepage}/blob/main/CHANGELOG.md",
+    "source_code_uri" => "https://github.com/ethos-link/ethos-gemkit",
+    "changelog_uri" => "https://github.com/ethos-link/ethos-gemkit/blob/main/CHANGELOG.md",
     "rubygems_mfa_required" => "true",
     "default_lint_roller_plugin" => "Ethos::Gemkit::Plugin"
   }
-  spec.files = Dir.chdir(__dir__) { Dir["lib/**/*.rb", "exe/*", "mise.toml", "mise.lock", "README.md", "UPGRADE.md", "LICENSE.txt", "CHANGELOG.md"].select { |file| File.file?(file) } }
+  spec.files = Dir.chdir(__dir__) { Dir["lib/**/*.rb", "docs/**/*.md", "exe/*", "mise.toml", "mise.lock", "README.md", "UPGRADE.md", "LICENSE.txt", "CHANGELOG.md"].select { |file| File.file?(file) } }
   spec.bindir = "exe"
   spec.executables = ["ethos-gemkit"]
   spec.require_paths = ["lib"]
