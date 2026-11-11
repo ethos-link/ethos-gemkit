@@ -121,7 +121,7 @@ jobs:
           name: gem-${{ needs.build.outputs.commit }}
       - run: sha256sum --check --strict SHA256SUMS
       - if: needs.build.outputs.host == 'https://rubygems.org'
-        uses: ethos-link/configure-rubygems-credentials@9b2cf2e75bb26157e8b9909ce82f2736929cc571
+        uses: ethos-link/configure-rubygems-credentials@83edce531a4e493a5b1ecb9187e461dc7e038016
         with:
           owner: ${{ inputs.rubygems-owner || vars.RUBYGEMS_OWNER }}
       - name: Push the exact verified package with native RubyGems
